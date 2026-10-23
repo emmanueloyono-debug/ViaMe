@@ -1,0 +1,28 @@
+@startuml ViaMe_AD2_Onboarding
+title AD-2  Driver onboarding
+
+start
+:Driver submits personal data + licence;
+:Submits vehicle details
+ (plate · make · model · seats);
+if (email / phone / plate unique?) then (yes)
+  :Create user PENDING
+   + driver_profile PENDING
+   + vehicle PENDING;
+  :Admin reviews documents;
+  if (approved?) then (yes)
+    :driver_profile.verification = APPROVED;
+    :vehicle.status = ACTIVE;
+    :Driver can go ONLINE;
+  else (no)
+    :driver_profile.verification = REJECTED;
+    :Vehicle.status = INACTIVE;
+    :Driver notified (reason);
+  endif
+else (no)
+  :Show conflict error
+   (DUPLICATE_EMAIL / PHONE / PLATE);
+endif
+stop
+
+@enduml

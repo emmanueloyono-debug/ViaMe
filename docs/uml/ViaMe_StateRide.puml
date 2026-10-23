@@ -1,0 +1,44 @@
+@startuml ViaMe_StateRide
+title State Machine — Ride lifecycle
+
+skinparam state {
+  BackgroundColor #FDF6E3
+  BorderColor #333333
+  ArrowColor #333333
+}
+
+[*] --> REQUESTED : passenger confirms
+
+REQUESTED --> ASSIGNED         : driver offered & accepted
+REQUESTED --> NO_DRIVER_FOUND  : no candidate / 3 rejections
+REQUESTED --> CANCELLED        : passenger cancels (free)
+
+ASSIGNED --> DRIVER_EN_ROUTE   : driver accepts
+ASSIGNED --> REQUESTED         : driver rejects / timeout
+ASSIGNED --> CANCELLED         : cancel (fee applies)
+
+DRIVER_EN_ROUTE --> ARRIVED    : driver at pickup
+DRIVER_EN_ROUTE --> CANCELLED  : cancel (fee applies)
+
+ARRIVED --> IN_PROGRESS        : driver starts trip
+ARRIVED --> CANCELLED          : passenger no-show (fee applies)
+
+IN_PROGRESS --> COMPLETED      : driver completes
+IN_PROGRESS --> CANCELLED      : emergency cancel
+
+COMPLETED        --> [*]
+CANCELLED        --> [*]
+NO_DRIVER_FOUND  --> [*]
+
+note right of ASSIGNED
+  Every transition is validated server-side
+  (RideService). Illegal transitions throw
+  IllegalStateTransitionException.
+end note
+
+note right of ASSIGNED
+  Optimistic lock on `version`
+  guards double assignment.
+end note
+
+@enduml

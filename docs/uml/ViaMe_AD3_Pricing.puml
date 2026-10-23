@@ -1,0 +1,19 @@
+@startuml ViaMe_AD3_Pricing
+title AD-3  Admin configures pricing rules
+
+start
+:Admin opens Pricing screen;
+:Admin edits baseFare / perKm / perMin / surge;
+if (validation passes?
+   all >= 0 · surge 1.0 … 3.0) then (yes)
+  :Deactivate current active rule;
+  :Insert new pricing_rule  (validFrom = now);
+  :Write audit_log entry;
+  :New rides use the new rule;
+else (no)
+  :Show inline error;
+  :Restore previous values;
+endif
+stop
+
+@enduml

@@ -1,0 +1,161 @@
+@startuml ViaMe_ERD
+title ViaMe — Conceptual ERD (physical implementation uses snake_case tables)
+
+hide methods
+hide stereotypes
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 10
+skinparam entity {
+  BackgroundColor #FDF6E3
+  BorderColor #333333
+}
+
+entity "user" as USER {
+  * id           : BIGINT <<PK>>
+  --
+  * email        : VARCHAR(150) <<UK>>
+  * phone        : VARCHAR(20)  <<UK>>
+  * password_hash : VARCHAR(255)
+  * password_salt : VARCHAR(64)
+  * role         : ENUM('PASSENGER','DRIVER','ADMIN')
+  * status       : ENUM('ACTIVE','PENDING','SUSPENDED')
+  * created_at   : DATETIME
+}
+
+entity "passenger_profile" as PP {
+  * user_id              : BIGINT <<PK, FK>>
+  --
+  * full_name            : VARCHAR(120)
+    default_payment_method : VARCHAR(20)
+}
+
+entity "driver_profile" as DP {
+  * user_id               : BIGINT <<PK, FK>>
+  --
+  * full_name             : VARCHAR(120)
+  * licence_number        : VARCHAR(40) <<UK>>
+  * verification_status   : ENUM('PENDING','APPROVED','REJECTED')
+    rating_avg            : DECIMAL(3,2)
+  * availability          : ENUM('ONLINE','OFFLINE','ON_TRIP')
+}
+
+entity "vehicle" as VEH {
+  * id           : BIGINT <<PK>>
+  --
+  * driver_id    : BIGINT <<FK>>
+  * plate_number : VARCHAR(20) <<UK>>
+  * make         : VARCHAR(40)
+  * model        : VARCHAR(40)
+  * seats        : INT
+  * status       : ENUM('PENDING','ACTIVE','INACTIVE')
+}
+
+entity "ride" as RIDE {
+  * id             : BIGINT <<PK>>
+  --
+  * passenger_id   : BIGINT <<FK>>
+    driver_id      : BIGINT <<FK>>
+    vehicle_id     : BIGINT <<FK>>
+  * pricing_rule_id : BIGINT <<FK>>
+  * pickup_lat     : DECIMAL(9,6)
+  * pickup_lng     : DECIMAL(9,6)
+  * pickup_address : VARCHAR(255)
+  * dropoff_lat    : DECIMAL(9,6)
+  * dropoff_lng    : DECIMAL(9,6)
+  * dropoff_address : VARCHAR(255)
+  * distance_km    : DECIMAL(6,2)
+  * duration_min   : INT
+  * status         : ENUM('REQUESTED','ASSIGNED','DRIVER_EN_ROUTE',
+                          'ARRIVED','IN_PROGRESS','COMPLETED',
+                          'CANCELLED','NO_DRIVER_FOUND')
+  * requested_at   : DATETIME
+    accepted_at    : DATETIME
+    started_at     : DATETIME
+    completed_at   : DATETIME
+    cancelled_at   : DATETIME
+  * version        : INT
+}
+
+entity "fare" as FARE {
+  * id                : BIGINT <<PK>>
+  --
+  * ride_id           : BIGINT <<FK, UK>>
+  * base_fare         : DECIMAL(10,2)
+  * distance_component: DECIMAL(10,2)
+  * time_component    : DECIMAL(10,2)
+  * surge_multiplier  : DECIMAL(4,2)
+  * total_amount      : DECIMAL(10,2)
+  * currency          : VARCHAR(3)
+}
+
+entity "payment" as PAY {
+  * id              : BIGINT <<PK>>
+  --
+  * ride_id         : BIGINT <<FK>>
+  * amount          : DECIMAL(10,2)
+  * method          : ENUM('CARD','MOBILE_MONEY')
+  * status          : ENUM('PENDING','PAID','FAILED','REFUNDED')
+    transaction_ref : VARCHAR(80) <<UK>>
+    paid_at         : DATETIME
+}
+
+entity "rating" as RAT {
+  * id         : BIGINT <<PK>>
+  --
+  * ride_id    : BIGINT <<FK>>
+  * rater_id   : BIGINT <<FK>>
+  * ratee_id   : BIGINT <<FK>>
+  * score      : TINYINT
+    comment    : VARCHAR(500)
+  * created_at : DATETIME
+}
+
+entity "pricing_rule" as PR {
+  * id               : BIGINT <<PK>>
+  --
+  * name             : VARCHAR(60)
+  * base_fare        : DECIMAL(10,2)
+  * per_km           : DECIMAL(10,2)
+  * per_min          : DECIMAL(10,2)
+  * surge_multiplier : DECIMAL(4,2)
+  * active           : BOOLEAN
+  * valid_from       : DATETIME
+}
+
+entity "session" as SESS {
+  * token_hash : VARCHAR(64) <<PK>>
+  --
+  * user_id    : BIGINT <<FK>>
+  * expires_at : DATETIME
+    ip_address : VARCHAR(45)
+}
+
+entity "audit_log" as AUD {
+  * id         : BIGINT <<PK>>
+  --
+    user_id    : BIGINT <<FK>>
+  * action     : VARCHAR(60)
+    entity     : VARCHAR(40)
+    entity_id  : BIGINT
+  * created_at : DATETIME
+}
+
+' ----- Relationships (crow's foot) -----
+USER ||--o| PP    : "is a passenger"
+USER ||--o| DP    : "is a driver"
+USER ||--o{ SESS  : "authenticates"
+USER ||--o{ AUD   : "generates"
+
+DP   ||--o{ VEH   : "owns"
+PP   ||--o{ RIDE  : "requests"
+DP   ||--o{ RIDE  : "serves"
+VEH  ||--o{ RIDE  : "used for"
+PR   ||--o{ RIDE  : "computes fare"
+
+RIDE ||--|| FARE  : "has one"
+RIDE ||--o| PAY   : "settled by"
+RIDE ||--o{ RAT   : "receives"
+
+@enduml
