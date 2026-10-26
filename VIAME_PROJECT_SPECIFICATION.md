@@ -184,18 +184,18 @@ graph LR
 #### Deployment Diagram
 ```mermaid
 graph TD
-    node_workstation["Client Workstation\n(OS: Windows / Linux / macOS)\n[Java SE JRE 17+, JavaFX 17+]"] {
+    subgraph Client_Workstation ["Client Workstation (Windows / Linux / macOS) - JRE 17+, JavaFX 17+"]
         artifact_jar["ViaMe-Application.jar"]
-        artifact_fxml["resources/fxml/*.fxml & styles.css"]
+        artifact_fxml["resources/fxml/*.fxml and styles.css"]
         artifact_config["config/db.properties"]
-    }
+    end
 
-    node_db_server["Database Host Server\n[MySQL Server 8.0+]"] {
+    subgraph Database_Host ["Database Host Server - MySQL Server 8.0+"]
         artifact_db["Database: viame_db"]
         artifact_storage["InnoDB Storage Engine (ACID Log Files, Tablespaces)"]
-    }
+    end
 
-    node_workstation -- "Encrypted JDBC Socket Connection\n(Port 3306, SSL/TLS Enabled)" --> node_db_server
+    Client_Workstation -- "Encrypted JDBC Socket Connection (Port 3306, SSL/TLS Enabled)" --> Database_Host
 ```
 
 ---
@@ -662,52 +662,52 @@ sequenceDiagram
 #### Activity 1: Ride Booking & Driver Dispatch Workflow
 ```mermaid
 flowchart TD
-    Start([Passenger Opens App]) --> EnterCoords[Input Pickup & Destination]
-    EnterCoords --> CalcDist[System Calculates Distance & Estimated Fare]
-    CalcDist --> ConfirmBooking{Passenger Confirms?}
-    ConfirmBooking -- No --> Abandon[Booking Cancelled / Exit]
-    ConfirmBooking -- Yes --> Broadcast[System Broadcasts to Nearest Drivers]
-    Broadcast --> StartTimer[Start 30-Second Acceptance Timer]
-    StartTimer --> CheckResponse{Driver Accepts?}
-    CheckResponse -- Yes --> AssignDriver[Assign Driver & Lock Trip Record]
-    AssignDriver --> NotifyBoth[Notify Passenger & Route Driver]
-    NotifyBoth --> EndSuccess([Dispatch Completed])
-    CheckResponse -- No / Timeout --> ExpandRadius{Retry With Wider Radius?}
+    Start(["Passenger Opens App"]) --> EnterCoords["Input Pickup and Destination"]
+    EnterCoords --> CalcDist["System Calculates Distance and Estimated Fare"]
+    CalcDist --> ConfirmBooking{"Passenger Confirms?"}
+    ConfirmBooking -- No --> Abandon["Booking Cancelled / Exit"]
+    ConfirmBooking -- Yes --> Broadcast["System Broadcasts to Nearest Drivers"]
+    Broadcast --> StartTimer["Start 30-Second Acceptance Timer"]
+    StartTimer --> CheckResponse{"Driver Accepts?"}
+    CheckResponse -- Yes --> AssignDriver["Assign Driver and Lock Trip Record"]
+    AssignDriver --> NotifyBoth["Notify Passenger and Route Driver"]
+    NotifyBoth --> EndSuccess(["Dispatch Completed"])
+    CheckResponse -- No / Timeout --> ExpandRadius{"Retry With Wider Radius?"}
     ExpandRadius -- Yes --> Broadcast
-    ExpandRadius -- No --> CancelTrip[Notify Passenger: No Driver Available]
-    CancelTrip --> EndFail([Dispatch Failed])
+    ExpandRadius -- No --> CancelTrip["Notify Passenger: No Driver Available"]
+    CancelTrip --> EndFail(["Dispatch Failed"])
 ```
 
 #### Activity 2: Driver Ride Execution & Location Simulation Workflow
 ```mermaid
 flowchart TD
-    Start([Driver Receives Assignment]) --> NavigateToPickup[Driver Navigates to Pickup]
-    NavigateToPickup --> DriverArrives[Driver Clicks 'I Have Arrived']
-    DriverArrives --> NotifyPass[Passenger Notified of Arrival]
-    NotifyPass --> StartRide[Passenger Boards -> Driver Clicks 'Start Trip']
-    StartRide --> ChangeStatus[Trip Status Updated: IN_PROGRESS]
-    ChangeStatus --> TravelSim[Simulate Coordinate Progression]
-    TravelSim --> ReachDest[Reach Dropoff Destination]
-    ReachDest --> EndTrip[Driver Clicks 'End Trip']
-    EndTrip --> TriggerPayment[Invoke Payment Settlement Engine]
-    TriggerPayment --> RatePrompt[Prompt Rating & Feedback]
-    RatePrompt --> EndWorkflow([Trip Lifecycle Concluded])
+    Start(["Driver Receives Assignment"]) --> NavigateToPickup["Driver Navigates to Pickup"]
+    NavigateToPickup --> DriverArrives["Driver Clicks: I Have Arrived"]
+    DriverArrives --> NotifyPass["Passenger Notified of Arrival"]
+    NotifyPass --> StartRide["Passenger Boards and Driver Clicks: Start Trip"]
+    StartRide --> ChangeStatus["Trip Status Updated: IN_PROGRESS"]
+    ChangeStatus --> TravelSim["Simulate Coordinate Progression"]
+    TravelSim --> ReachDest["Reach Dropoff Destination"]
+    ReachDest --> EndTrip["Driver Clicks: End Trip"]
+    EndTrip --> TriggerPayment["Invoke Payment Settlement Engine"]
+    TriggerPayment --> RatePrompt["Prompt Rating and Feedback"]
+    RatePrompt --> EndWorkflow(["Trip Lifecycle Concluded"])
 ```
 
 #### Activity 3: Fare Calculation & Dynamic Surge Pipeline
 ```mermaid
 flowchart TD
-    Start([Calculate Fare Invoked]) --> GetBase[Retrieve Vehicle Category Base Fare]
-    GetBase --> GetDistanceRate[Multiply Distance by Per-Km Rate]
-    GetDistanceRate --> GetTimeRate[Calculate Estimated Duration Fee]
-    GetTimeRate --> CheckDemand[Query Active Requests vs Available Drivers]
-    CheckDemand --> SurgeCheck{Demand / Supply Ratio > 1.5?}
-    SurgeCheck -- Yes --> ApplySurge[Apply 1.3x - 1.8x Surge Multiplier]
-    SurgeCheck -- No --> StandardRate[Surge Multiplier = 1.0]
-    ApplySurge --> ComputeTotal[Compute Total = (Base + Dist + Time) * Surge]
+    Start(["Calculate Fare Invoked"]) --> GetBase["Retrieve Vehicle Category Base Fare"]
+    GetBase --> GetDistanceRate["Multiply Distance by Per-Km Rate"]
+    GetDistanceRate --> GetTimeRate["Calculate Estimated Duration Fee"]
+    GetTimeRate --> CheckDemand["Query Active Requests vs Available Drivers"]
+    CheckDemand --> SurgeCheck{"Demand / Supply Ratio > 1.5?"}
+    SurgeCheck -- Yes --> ApplySurge["Apply 1.3x - 1.8x Surge Multiplier"]
+    SurgeCheck -- No --> StandardRate["Surge Multiplier = 1.0"]
+    ApplySurge --> ComputeTotal["Compute Total = Base + Distance + Time multiplied by Surge"]
     StandardRate --> ComputeTotal
-    ComputeTotal --> RoundCurrency[Round to Nearest Currency Unit]
-    RoundCurrency --> OutputFare([Return Guaranteed Fare])
+    ComputeTotal --> RoundCurrency["Round to Nearest Currency Unit"]
+    RoundCurrency --> OutputFare(["Return Guaranteed Fare"])
 ```
 
 #### Activity 4: Driver Onboarding & Document Verification (AD-2)
@@ -826,9 +826,9 @@ erDiagram
         string phone UK
         string password_hash
         string password_salt
-        enum role
-        enum status
-        datetime created_at
+        string role
+        string status
+        string created_at
     }
 
     PASSENGER_PROFILE {
@@ -841,9 +841,9 @@ erDiagram
         bigint user_id PK
         string full_name
         string licence_number UK
-        enum verification_status
+        string verification_status
         decimal rating_avg
-        enum availability
+        string availability
     }
 
     VEHICLE {
@@ -853,7 +853,7 @@ erDiagram
         string make
         string model
         int seats
-        enum status
+        string status
     }
 
     RIDE {
@@ -870,12 +870,12 @@ erDiagram
         string dropoff_address
         decimal distance_km
         int duration_min
-        enum status
-        datetime requested_at
-        datetime accepted_at
-        datetime started_at
-        datetime completed_at
-        datetime cancelled_at
+        string status
+        string requested_at
+        string accepted_at
+        string started_at
+        string completed_at
+        string cancelled_at
         int version
     }
 
@@ -894,10 +894,10 @@ erDiagram
         bigint id PK
         bigint ride_id FK
         decimal amount
-        enum method
-        enum status
+        string method
+        string status
         string transaction_ref UK
-        datetime paid_at
+        string paid_at
     }
 
     RATING {
@@ -905,9 +905,9 @@ erDiagram
         bigint ride_id FK
         bigint rater_id FK
         bigint ratee_id FK
-        tinyint score
+        int score
         string comment
-        datetime created_at
+        string created_at
     }
 
     PRICING_RULE {
@@ -918,13 +918,13 @@ erDiagram
         decimal per_min
         decimal surge_multiplier
         boolean active
-        datetime valid_from
+        string valid_from
     }
 
     SESSION {
         string token_hash PK
         bigint user_id FK
-        datetime expires_at
+        string expires_at
         string ip_address
     }
 
@@ -934,7 +934,7 @@ erDiagram
         string action
         string entity
         bigint entity_id
-        datetime created_at
+        string created_at
     }
 ```
 
