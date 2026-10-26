@@ -716,17 +716,17 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start([Driver Submits Personal Data + Licence]) --> SubVeh[Submit Vehicle Details: Plate, Make, Model, Seats]
-    SubVeh --> CheckUniq{Email, Phone, and Plate Unique?}
-    CheckUniq -- No --> ShowConflict[Show Conflict Error: DUPLICATE_EMAIL / PHONE / PLATE]
-    ShowConflict --> StopFail([Terminated])
-    CheckUniq -- Yes --> CreatePending[Create user PENDING + driver_profile PENDING + vehicle PENDING]
-    CreatePending --> AdminReview[Admin Reviews Official Documents]
-    AdminReview --> IsApproved{Approved?}
-    IsApproved -- Yes --> ApproveDriver[driver_profile.verification = APPROVED<br>vehicle.status = ACTIVE<br>Driver Can Go ONLINE]
-    ApproveDriver --> StopSuccess([Onboarding Complete])
-    IsApproved -- No --> RejectDriver[driver_profile.verification = REJECTED<br>vehicle.status = INACTIVE<br>Driver Notified with Reason]
-    RejectDriver --> StopReject([Application Rejected])
+    Start(["Driver Submits Personal Data + Licence"]) --> SubVeh["Submit Vehicle Details: Plate, Make, Model, Seats"]
+    SubVeh --> CheckUniq{"Email, Phone, and Plate Unique?"}
+    CheckUniq -- No --> ShowConflict["Show Conflict Error: DUPLICATE_EMAIL / PHONE / PLATE"]
+    ShowConflict --> StopFail(["Terminated"])
+    CheckUniq -- Yes --> CreatePending["Create user PENDING + driver_profile PENDING + vehicle PENDING"]
+    CreatePending --> AdminReview["Admin Reviews Official Documents"]
+    AdminReview --> IsApproved{"Approved?"}
+    IsApproved -- Yes --> ApproveDriver["Update verification to APPROVED, Vehicle to ACTIVE. Driver can go ONLINE"]
+    ApproveDriver --> StopSuccess(["Onboarding Complete"])
+    IsApproved -- No --> RejectDriver["Update verification to REJECTED. Driver notified of reason"]
+    RejectDriver --> StopReject(["Application Rejected"])
 ```
 
 #### Activity 5: Administrator Pricing Rule Configuration & Auditing (AD-3)
@@ -735,16 +735,16 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start([Admin Opens Pricing Screen]) --> EditValues[Admin Edits baseFare, perKm, perMin, surgeMultiplier]
-    EditValues --> ValidateValues{Validation Passes?<br>All values >= 0<br>Surge between 1.0 and 3.0}
-    ValidateValues -- Yes --> DeactCurrent[Deactivate Current Active Pricing Rule]
-    DeactCurrent --> InsertNew[Insert New pricing_rule Record with validFrom = NOW]
-    InsertNew --> WriteAudit[Write Audit Log Entry with Admin ID]
-    WriteAudit --> ApplyNew[New Rides Automatically Use the New Rule]
-    ApplyNew --> StopSuccess([Configuration Complete])
-    ValidateValues -- No --> ShowError[Show Inline Validation Error]
-    ShowError --> RestoreOld[Restore Previous Configuration Values]
-    RestoreOld --> StopError([Aborted])
+    Start(["Admin Opens Pricing Screen"]) --> EditValues["Admin Edits baseFare, perKm, perMin, surgeMultiplier"]
+    EditValues --> ValidateValues{"Validation Passes? All >= 0, Surge between 1.0 and 3.0"}
+    ValidateValues -- Yes --> DeactCurrent["Deactivate Current Active Pricing Rule"]
+    DeactCurrent --> InsertNew["Insert New pricing_rule Record with validFrom = NOW"]
+    InsertNew --> WriteAudit["Write Audit Log Entry with Admin ID"]
+    WriteAudit --> ApplyNew["New Rides Automatically Use the New Rule"]
+    ApplyNew --> StopSuccess(["Configuration Complete"])
+    ValidateValues -- No --> ShowError["Show Inline Validation Error"]
+    ShowError --> RestoreOld["Restore Previous Configuration Values"]
+    RestoreOld --> StopError(["Aborted"])
 ```
 
 ---
@@ -832,13 +832,13 @@ erDiagram
     }
 
     PASSENGER_PROFILE {
-        bigint user_id PK, FK
+        bigint user_id PK
         string full_name
         string default_payment_method
     }
 
     DRIVER_PROFILE {
-        bigint user_id PK, FK
+        bigint user_id PK
         string full_name
         string licence_number UK
         enum verification_status
@@ -881,7 +881,7 @@ erDiagram
 
     FARE {
         bigint id PK
-        bigint ride_id FK, UK
+        bigint ride_id FK
         decimal base_fare
         decimal distance_component
         decimal time_component
