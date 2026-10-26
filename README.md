@@ -5,52 +5,258 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-00758F.svg)](https://www.mysql.com/)
 [![Academic Project](https://img.shields.io/badge/ISJ-Java%20Programming%20II-green.svg)](https://saintjeaningenieur.org/)
 
-**ViaMe** is an enterprise-grade, multi-role desktop simulation of an urban taxi and ride dispatching platform developed for **Institut Saint Jean (ISJ)**, Academic Year 2026/2027.
+**ViaMe** is an enterprise-grade, multi-role desktop simulation of an urban taxi and ride dispatching platform developed for **Institut Saint Jean (ISJ)**, Academic Year 2026/2027 (Course: Java Programming II, Lecturer: Engr Tanwi Nkiamboh).
 
 ---
 
-## 👥 Engineering Team & Role Allocation (Group of 4)
+## 👥 Engineering Team & Task Allocation Matrix (Group of 4)
 
-| Role | Engineer | Focus & Core Responsibilities |
-| :--- | :--- | :--- |
-| **Student 1: System Analyst & Database Engineer** | *Team Member 1* | Requirements analysis, 10 use case specifications, conceptual ERD, 3NF normalization, and physical MySQL schema. |
-| **Student 2: Software Architect & Backend Core Engineer** | *Team Member 2* | 5-tier layered architecture, core OOP domain modeling (encapsulation, polymorphism, abstraction), JDBC transactions, and concurrency control. |
-| **Student 3: UI/UX & JavaFX Application Developer** | *Team Member 3* | JavaFX Scene Builder FXML views, controller event handling, client-side validation, and multi-role simulation views. |
-| **Student 4: QA, Security & Deployment Engineer** | *Team Member 4* | BCrypt authentication, 5 dynamic business intelligence reports, JUnit test plan, and oral defense preparation. |
+| Role & Focus | Assigned Student | Current Status & Core Deliverables | Next Actions To Complete |
+| :--- | :--- | :--- | :--- |
+| **Student 1: System Analyst & Database Engineer** | *Team Member 1* | **Completed:** 10 Use Case specifications, Conceptual ERD, 3NF Normalization justification, and runnable `database/schema.sql` with triggers & seed data. | • Set up local MySQL 8.0 database.<br>• Execute `database/schema.sql` and verify indexes.<br>• Prepare database defense questions (1NF $\to$ 3NF proof). |
+| **Student 2: Software Architect & Backend Core Engineer** | *Team Member 2* | **Completed:** 5-tier layered architecture design, `pom.xml`, OOP domain models (`User`, `Passenger`, `Driver`, `Trip`, etc.), DAO layer (`TripDAOImpl`) with ACID transactions and pessimistic locking. | • Implement remaining DAOs (`UserDAOImpl`, `PaymentDAOImpl`, `VehicleDAOImpl`).<br>• Implement `FareCalculationService` (Surge strategy) and `AuthenticationService`. |
+| **Student 3: UI/UX & JavaFX Application Developer** | *Team Member 3* | **Ready to begin:** Screen flow specifications and JavaFX architecture mapped in `VIAME_PROJECT_SPECIFICATION.md`. | • Open Scene Builder and create FXML files in `src/main/resources/com/viame/views/`: `LoginView.fxml`, `PassengerDashboard.fxml`, `DriverDashboard.fxml`, `AdminConsole.fxml`.<br>• Bind UI elements to JavaFX Controllers. |
+| **Student 4: QA, Security & Deployment Engineer** | *Team Member 4* | **Ready to begin:** JUnit test organization and 5 BI reports specified in `VIAME_PROJECT_SPECIFICATION.md`. | • Implement unit tests under `src/test/java/` (`PassengerTest`, `TripTest`, `PasswordHasherTest`).<br>• Implement JasperReports or JavaFX Chart export for the 5 BI reports.<br>• Prepare oral defense slides. |
 
 ---
 
 ## 🏛️ System Architecture
 
-ViaMe employs a decoupled **5-Tier Layered Architecture**:
+ViaMe implements a strictly decoupled **5-Tier Layered Architecture**:
 
-```
-Presentation (JavaFX / FXML)
-       │
-       ▼
-Controllers (Event Handlers & Form Validation)
-       │
-       ▼
-Service Layer (Business Logic, Dispatch Engine, Fare Strategies)
-       │
-       ▼
-Data Access Layer (DAO Pattern with PreparedStatements)
-       │
-       ▼
-Database Engine (MySQL 8.0 with InnoDB Storage Engine)
+```mermaid
+graph TD
+    subgraph Tier_1 ["Tier 1: Presentation Layer (JavaFX Scene Builder)"]
+        UI1["PassengerDashboard.fxml"]
+        UI2["DriverDashboard.fxml"]
+        UI3["AdminConsole.fxml"]
+        UI4["LoginRegisterDialog.fxml"]
+    end
+
+    subgraph Tier_2 ["Tier 2: Controller Layer"]
+        C1["PassengerController"]
+        C2["DriverController"]
+        C3["AdminReportController"]
+        C4["AuthController"]
+    end
+
+    subgraph Tier_3 ["Tier 3: Service Layer (Business Logic)"]
+        S1["TripService (State Machine & Dispatch)"]
+        S2["FareCalculationService (Strategy)"]
+        S3["AuthenticationService (BCrypt)"]
+        S4["PaymentService (ACID Transactions)"]
+        S5["ReportService (Aggregations)"]
+    end
+
+    subgraph Tier_4 ["Tier 4: Data Access Layer (DAO Pattern)"]
+        D1["TripDAO / TripDAOImpl"]
+        D2["UserDAO / UserDAOImpl"]
+        D3["PaymentDAO / PaymentDAOImpl"]
+        D4["DBConnection (Thread-Safe Singleton)"]
+    end
+
+    subgraph Tier_5 ["Tier 5: Relational Persistence Engine"]
+        DB[("MySQL 8.0 InnoDB Database\n(viame_db - 3NF)")]
+    end
+
+    Tier_1 --> Tier_2
+    Tier_2 --> Tier_3
+    Tier_3 --> Tier_4
+    Tier_4 --> Tier_5
 ```
 
 ---
 
-## 📊 Complete UML & Design Suite
+## 📊 Live UML Diagrams (Rendered Directly in GitHub)
 
-All PlantUML diagram sources are maintained in the [`docs/uml/`](docs/uml/) directory:
+All source `.puml` files are archived in [`docs/uml/`](docs/uml/). The diagrams below render natively on GitHub:
 
-| Diagram | Source File | Live Vector Rendering | Live Raster Rendering |
-| :--- | :--- | :--- | :--- |
-| **Conceptual ERD (3NF)** | [`ViaMe_ERD.puml`](docs/uml/ViaMe_ERD.puml) | [SVG View](https://www.plantuml.com/plantuml/svg/~1dLVTSgCs5BxdAJJfXPETP2Qx-PbsPsTdYS5PMXkxsCvChXW5P5iJG5GIITDDP_eGVS8-IOyam623iorNmFaa7RxpdH--28cvBD84tL4y8Q4RE9QaCY7c6VtprzzeoBA8vBB02G8pEiutBu96y4JJF24foIIMb6Me44GWaU574aPO42JnGqB4YMLjQ4nGIkI6nS8y24auOV8b9y8IZpJBCSSfIcX6r3l4E60R1h71CNkcsHgjS298mnAJ5IuIEMAPz75Aq9oi6K5BhnioftyGzFwyOGJdgNn1too4Rd3qkEQioE8XInX7FuoSqRLxeIoCnuINRo_qPVrfMUNQ8_XkVeImGCkv6-YjtY4Qe-tr4Trujvw_G9y-pNxv_1a0PsSQHL9CaotgpWw6N-tW-FtL-GbWbmRx3kKRbf5zs0T0jM1OY6TmDTnWiMdYhgvEsW214za0N5yQEsS9QJZj-il9yM1cp-UkV-i6WzE14tXt-iPs9fu_CAj0GR8GEwliuGAWW9ovlkFvjt0tNyxLW-kKwo9Ei2HnYALUvzWBT-5Dt2Qpoc6IhGaFSyvMD26Qvjci95aH7xQOtYNx58rQXA-A90ap9PJMYffueDHIhqhDX3b-KVeEZNZRt3STZJbzsl7IEUZb_t1ptyzta34HWUGCio9z87mVUDaM4lX8Lv2wAbt3EcvrfEjGsRDPCBs3I9qE0lTdTxWeWuOGXxNPEiHFwxPdZZlq9lRu-EBqW_4CFu6qyGDD53zxefhwOyzNyfYEHjMT7ou2RpPeyVf4DZGg2Rrpl_wdv2fZOi0DrAZEbmJqLr7NJgi6PodKiuuGN9OHI5bCEbAuCWlGkDYQmOF-d6dmNsMFvvUtBLOub51DIU0vRXSd1rZPffHUiSyBQXFN3IdZKc4wsUKqKbBXXS5rOcZqMEHXeaj0KqO_dLwVj13P-Wq4ZcDEXEWgUp5dELkjgcCwzgWHvfW3Y4F7K8YgIiR7jBt9TPKJSS5DwgKqwvV3LX21--lIdIzq7a8LzcvzVMkgSEZwOJ1TBa0c5kgz1dQWq8xMKWXPVHkuypay3QUJsTZLUnzQFhJzeJiUwmtyQLWUFPek_QgCS_9RGKHN8LSRu4YD3fLnrwg7ZzguQusOcY_wTeuKrqdIQTMLJgYPf9LvZHHQOMvIQ6G7FIbqA8jK1ePzPMW4zRmk7mym2ONgj0Qo4iRxyrePbNRKDqEppsGNIjAqWUZRInHyJS8KsXVD4wgwmXPrMM_594v2dCAu8_lTYWhEeR-q2dYb-ukJTgVMZTBqP_k-Xz7lvhEhM3ITxNEuxDCDZCcaeHqe1K-cDzxO3ITJtxtlcbvGLp6UsPvQExAzSTaHHyjwZ458Sfm97EcyvcJLOEZ7PYD1K7bfhVGTjJThkswmfhhRYtqUluV2BlPWt_wQRyoatomYLYdu8rfu_hsfN3f7qrgBrOTVdP_lZNWz0rwZIHZjT0xG1p_ym9nqNVgnbuHTsic17rEwtm2Pwdq0j9U17Gce5FD4MgVTJATZr_PD_S89g6N5MRezfuC_-EDIPKvJDuV2Nf8dsIF9Tdy3OChVuwunctQ5dVoUKsXtE_5JQDhLSI-lMZK15p6LOSACcksbyzrgHcyvPlAjCzge-gTh6ozRHhrrjV5XgGx09RXGG1BTlCM6vW8THvmz3mHQCIPF3CBIlt-lhsTdx5Nze-ZZZwX0U3jq7RL0JWjangucufk9gKBWGcwKwp2x4z76A68rPaqometTqbkN03KuQm1xpi0sQvZq0AbCPHS7izDbXcWygNtrLhj6Y5KCH83haBtxPjMm2l0AwPvhMTgWGA-lflig46WLGLSxsbeLYT18okEbX4wF7bwQW6-wGfRkHuHg3wql98kBDB7-1G) | [PNG View](https://www.plantuml.com/plantuml/png/~1dLVTSgCs5BxdAJJfXPETP2Qx-PbsPsTdYS5PMXkxsCvChXW5P5iJG5GIITDDP_eGVS8-IOyam623iorNmFaa7RxpdH--28cvBD84tL4y8Q4RE9QaCY7c6VtprzzeoBA8vBB02G8pEiutBu96y4JJF24foIIMb6Me44GWaU574aPO42JnGqB4YMLjQ4nGIkI6nS8y24auOV8b9y8IZpJBCSSfIcX6r3l4E60R1h71CNkcsHgjS298mnAJ5IuIEMAPz75Aq9oi6K5BhnioftyGzFwyOGJdgNn1too4Rd3qkEQioE8XInX7FuoSqRLxeIoCnuINRo_qPVrfMUNQ8_XkVeImGCkv6-YjtY4Qe-tr4Trujvw_G9y-pNxv_1a0PsSQHL9CaotgpWw6N-tW-FtL-GbWbmRx3kKRbf5zs0T0jM1OY6TmDTnWiMdYhgvEsW214za0N5yQEsS9QJZj-il9yM1cp-UkV-i6WzE14tXt-iPs9fu_CAj0GR8GEwliuGAWW9ovlkFvjt0tNyxLW-kKwo9Ei2HnYALUvzWBT-5Dt2Qpoc6IhGaFSyvMD26Qvjci95aH7xQOtYNx58rQXA-A90ap9PJMYffueDHIhqhDX3b-KVeEZNZRt3STZJbzsl7IEUZb_t1ptyzta34HWUGCio9z87mVUDaM4lX8Lv2wAbt3EcvrfEjGsRDPCBs3I9qE0lTdTxWeWuOGXxNPEiHFwxPdZZlq9lRu-EBqW_4CFu6qyGDD53zxefhwOyzNyfYEHjMT7ou2RpPeyVf4DZGg2Rrpl_wdv2fZOi0DrAZEbmJqLr7NJgi6PodKiuuGN9OHI5bCEbAuCWlGkDYQmOF-d6dmNsMFvvUtBLOub51DIU0vRXSd1rZPffHUiSyBQXFN3IdZKc4wsUKqKbBXXS5rOcZqMEHXeaj0KqO_dLwVj13P-Wq4ZcDEXEWgUp5dELkjgcCwzgWHvfW3Y4F7K8YgIiR7jBt9TPKJSS5DwgKqwvV3LX21--lIdIzq7a8LzcvzVMkgSEZwOJ1TBa0c5kgz1dQWq8xMKWXPVHkuypay3QUJsTZLUnzQFhJzeJiUwmtyQLWUFPek_QgCS_9RGKHN8LSRu4YD3fLnrwg7ZzguQusOcY_wTeuKrqdIQTMLJgYPf9LvZHHQOMvIQ6G7FIbqA8jK1ePzPMW4zRmk7mym2ONgj0Qo4iRxyrePbNRKDqEppsGNIjAqWUZRInHyJS8KsXVD4wgwmXPrMM_594v2dCAu8_lTYWhEeR-q2dYb-ukJTgVMZTBqP_k-Xz7lvhEhM3ITxNEuxDCDZCcaeHqe1K-cDzxO3ITJtxtlcbvGLp6UsPvQExAzSTaHHyjwZ458Sfm97EcyvcJLOEZ7PYD1K7bfhVGTjJThkswmfhhRYtqUluV2BlPWt_wQRyoatomYLYdu8rfu_hsfN3f7qrgBrOTVdP_lZNWz0rwZIHZjT0xG1p_ym9nqNVgnbuHTsic17rEwtm2Pwdq0j9U17Gce5FD4MgVTJATZr_PD_S89g6N5MRezfuC_-EDIPKvJDuV2Nf8dsIF9Tdy3OChVuwunctQ5dVoUKsXtE_5JQDhLSI-lMZK15p6LOSACcksbyzrgHcyvPlAjCzge-gTh6ozRHhrrjV5XgGx09RXGG1BTlCM6vW8THvmz3mHQCIPF3CBIlt-lhsTdx5Nze-ZZZwX0U3jq7RL0JWjangucufk9gKBWGcwKwp2x4z76A68rPaqometTqbkN03KuQm1xpi0sQvZq0AbCPHS7izDbXcWygNtrLhj6Y5KCH83haBtxPjMm2l0AwPvhMTgWGA-lflig46WLGLSxsbeLYT18okEbX4wF7bwQW6-wGfRkHuHg3wql98kBDB7-1G) |
-| **Ride State Machine** | [`ViaMe_StateRide.puml`](docs/uml/ViaMe_StateRide.puml) | [SVG View](https://www.plantuml.com/plantuml/svg/~1VLHDZzCm4BtxLuo4X7QHkXmgSUW1xTAcgqfjiYJjNX3g6cUQcZfsP3kxL0Y97y4lv9SmJZ_J03aby-RvlPdC-DPvRdrTAdYKV8RBp7EFgSoHUUaLGlCDCoxMKYFy_laB0WXAhb1iXKB6t4RgYbjUWcjolpE03rni2cjgdG-DCXPUZKVZTr4_8CRcQFVHVlDGzCvQyz8E_c3iqvlFqEkzXpJwk8YoUJI20LJSETG5MX16hwGj7MCdF6JVPTdaFgQFmpE0tCfdOfZL2Ytcy1gu45Xvp2-eSR8SfPF7A5sEaqKy2bHjG72TopoKzXRwOF4h2Y-DTXVauLqyZARJat3BBDS2bOEhbKMyPkneCZ3tcb6yJ9F5F3gtl3FgsladtKw9EtUEd7fPegbzczdnICoTDNA62Bogb4H71YyzDPrDGt3K4kGUAYasTVLNnfdUluGEXuRqIRnyI9FxDCgoJcNDd3hmLbOjJhUaLkErwRcrURbKFLTgJabc3zFesDAZgZ1bfT2ZwpBQkWF04cs1McptXJ9sSIWqF1fgrl5y03e3U02ODZH_LXPhJsDyd75QdOXiRgajN3iPnXAaWsUkce7DmQ4blEV2GWDSXTtDA2G5Nj_0H2aik3eZKt_Nj8cKkiUQzPyVyUXR64TwkM6eSmYc_cCjeTHIEYy5A2CsGEQUo8qZ_XF1HSrjxY0tzHUwQEYFoKANgFtvsRVqIfSJ-mC) | [PNG View](https://www.plantuml.com/plantuml/png/~1VLHDZzCm4BtxLuo4X7QHkXmgSUW1xTAcgqfjiYJjNX3g6cUQcZfsP3kxL0Y97y4lv9SmJZ_J03aby-RvlPdC-DPvRdrTAdYKV8RBp7EFgSoHUUaLGlCDCoxMKYFy_laB0WXAhb1iXKB6t4RgYbjUWcjolpE03rni2cjgdG-DCXPUZKVZTr4_8CRcQFVHVlDGzCvQyz8E_c3iqvlFqEkzXpJwk8YoUJI20LJSETG5MX16hwGj7MCdF6JVPTdaFgQFmpE0tCfdOfZL2Ytcy1gu45Xvp2-eSR8SfPF7A5sEaqKy2bHjG72TopoKzXRwOF4h2Y-DTXVauLqyZARJat3BBDS2bOEhbKMyPkneCZ3tcb6yJ9F5F3gtl3FgsladtKw9EtUEd7fPegbzczdnICoTDNA62Bogb4H71YyzDPrDGt3K4kGUAYasTVLNnfdUluGEXuRqIRnyI9FxDCgoJcNDd3hmLbOjJhUaLkErwRcrURbKFLTgJabc3zFesDAZgZ1bfT2ZwpBQkWF04cs1McptXJ9sSIWqF1fgrl5y03e3U02ODZH_LXPhJsDyd75QdOXiRgajN3iPnXAaWsUkce7DmQ4blEV2GWDSXTtDA2G5Nj_0H2aik3eZKt_Nj8cKkiUQzPyVyUXR64TwkM6eSmYc_cCjeTHIEYy5A2CsGEQUo8qZ_XF1HSrjxY0tzHUwQEYFoKANgFtvsRVqIfSJ-mC) |
-| **Driver Onboarding (AD-2)** | [`ViaMe_AD2_Onboarding.puml`](docs/uml/ViaMe_AD2_Onboarding.puml) | [SVG View](https://www.plantuml.com/plantuml/svg/~1ZL9DJyCm3BtdL_ZO2G7IZfiGL6i5HLjNZT7hb3NkPj4c9Kc7-6NS-MMuNVaOui39Zf_ztfET6-UbzMrTGKvoWPim6c-MUckaLQHtmfEl4CBeV0mGMJgW1VEDYdvOJ0R4jTkQl8C6hJDQLg2abt065HMe2voAoSFGSS0z5Koiq4kgd82WgQH7U7-3MZuTer5OTOb3wTreAgY406jkXqjezaPZ5_kfLjDpYzSZy7lK4BoY6mc0oSnYZpgsbiLfbAItN6O_ghUxQQmfYKsSO9_EXkAq8mfLJHei7WXV72XJj3LgxpgiCoKRPZgW-cs09q-LBZYdaWhfoMYuWZ3BLiiyZgR7va7wWfVgMzVXitMInmCwxBYG6dO6bkayINi8AuSGQFClnLLy7y_MNuhvRyKa_KjJ6yyag23WZV9bHxskLbIAd-gJXxrvWSBeaW_k0QqrjkC9eiTidip2TRo95s4ovxjbTyiqxkASgqnt97FUD4BSy8F_e_W0) | [PNG View](https://www.plantuml.com/plantuml/png/~1ZL9DJyCm3BtdL_ZO2G7IZfiGL6i5HLjNZT7hb3NkPj4c9Kc7-6NS-MMuNVaOui39Zf_ztfET6-UbzMrTGKvoWPim6c-MUckaLQHtmfEl4CBeV0mGMJgW1VEDYdvOJ0R4jTkQl8C6hJDQLg2abt065HMe2voAoSFGSS0z5Koiq4kgd82WgQH7U7-3MZuTer5OTOb3wTreAgY406jkXqjezaPZ5_kfLjDpYzSZy7lK4BoY6mc0oSnYZpgsbiLfbAItN6O_ghUxQQmfYKsSO9_EXkAq8mfLJHei7WXV72XJj3LgxpgiCoKRPZgW-cs09q-LBZYdaWhfoMYuWZ3BLiiyZgR7va7wWfVgMzVXitMInmCwxBYG6dO6bkayINi8AuSGQFClnLLy7y_MNuhvRyKa_KjJ6yyag23WZV9bHxskLbIAd-gJXxrvWSBeaW_k0QqrjkC9eiTidip2TRo95s4ovxjbTyiqxkASgqnt97FUD4BSy8F_e_W0) |
-| **Pricing Rules (AD-3)** | [`ViaMe_AD3_Pricing.puml`](docs/uml/ViaMe_AD3_Pricing.puml) | [SVG View](https://www.plantuml.com/plantuml/svg/~1DL51RW8n3Bpd5NE4GoaLDn0jI0YfggYgLcgFADqrYwLiih8J4BU-fb_elK_fIngoS8hi6S-CdOL6Ap6r3kziDxHThYRR5-6AVMCYHqTOhcucmB9ksQCAViTD4b9qFGcI7AanHSPCUrheo2ikCj1AYFpi2bBDKV5fbTPM2BVeI9xQ_jra_1QQfA6PuHq61-kujf63HsTLIHyC0EiSxkSOu_Ud9-DkDCRVrpSce_4GSKyUWnFfC9EdAx9Lv8EDX2g9a8ye3IhHPsVAerUI24_7wrhRCuQB_rf2YpbyE0uB_KCuYzcK5zcwq21BogaWprb1kCxdIKhd74Mpzo6NMmCVIgYtVJY2lMDF894WPVoLD8Pyaqxem24fidqYpRE-vbs-SUYCMUGY_vVv1m) | [PNG View](https://www.plantuml.com/plantuml/png/~1DL51RW8n3Bpd5NE4GoaLDn0jI0YfggYgLcgFADqrYwLiih8J4BU-fb_elK_fIngoS8hi6S-CdOL6Ap6r3kziDxHThYRR5-6AVMCYHqTOhcucmB9ksQCAViTD4b9qFGcI7AanHSPCUrheo2ikCj1AYFpi2bBDKV5fbTPM2BVeI9xQ_jra_1QQfA6PuHq61-kujf63HsTLIHyC0EiSxkSOu_Ud9-DkDCRVrpSce_4GSKyUWnFfC9EdAx9Lv8EDX2g9a8ye3IhHPsVAerUI24_7wrhRCuQB_rf2YpbyE0uB_KCuYzcK5zcwq21BogaWprb1kCxdIKhd74Mpzo6NMmCVIgYtVJY2lMDF894WPVoLD8Pyaqxem24fidqYpRE-vbs-SUYCMUGY_vVv1m) |
+### 1. Conceptual Entity-Relationship Diagram (ERD — 3NF)
+*Source:* [`docs/uml/ViaMe_ERD.puml`](docs/uml/ViaMe_ERD.puml)
 
-For full specification and phase schedule, consult [VIAME_PROJECT_SPECIFICATION.md](VIAME_PROJECT_SPECIFICATION.md).
+```mermaid
+erDiagram
+    USER ||--o| PASSENGER_PROFILE : "is a passenger"
+    USER ||--o| DRIVER_PROFILE : "is a driver"
+    USER ||--o{ SESSION : "authenticates"
+    USER ||--o{ AUDIT_LOG : "generates"
+
+    DRIVER_PROFILE ||--o{ VEHICLE : "owns"
+    PASSENGER_PROFILE ||--o{ RIDE : "requests"
+    DRIVER_PROFILE ||--o{ RIDE : "serves"
+    VEHICLE ||--o{ RIDE : "used for"
+    PRICING_RULE ||--o{ RIDE : "computes fare"
+
+    RIDE ||--|| FARE : "has one"
+    RIDE ||--o| PAYMENT : "settled by"
+    RIDE ||--o{ RATING : "receives"
+
+    USER {
+        bigint id PK
+        string email UK
+        string phone UK
+        string password_hash
+        enum role
+        enum status
+    }
+
+    PASSENGER_PROFILE {
+        bigint user_id PK_FK
+        string full_name
+        decimal wallet_balance
+    }
+
+    DRIVER_PROFILE {
+        bigint user_id PK_FK
+        string full_name
+        string licence_number UK
+        enum verification_status
+        decimal rating_avg
+        enum availability
+    }
+
+    VEHICLE {
+        bigint id PK
+        bigint driver_id FK
+        string plate_number UK
+        string make
+        string model
+        int seats
+    }
+
+    RIDE {
+        bigint id PK
+        bigint passenger_id FK
+        bigint driver_id FK
+        string pickup_address
+        string dropoff_address
+        decimal distance_km
+        enum status
+        int version
+    }
+
+    FARE {
+        bigint id PK
+        bigint ride_id FK_UK
+        decimal base_fare
+        decimal distance_component
+        decimal time_component
+        decimal surge_multiplier
+        decimal total_amount
+    }
+
+    PAYMENT {
+        bigint id PK
+        bigint ride_id FK
+        decimal amount
+        enum method
+        enum status
+        string transaction_ref UK
+    }
+
+    PRICING_RULE {
+        bigint id PK
+        string name
+        decimal base_fare
+        decimal per_km
+        decimal surge_multiplier
+        boolean active
+    }
+```
+
+---
+
+### 2. Ride Lifecycle State Machine
+*Source:* [`docs/uml/ViaMe_StateRide.puml`](docs/uml/ViaMe_StateRide.puml)
+
+```mermaid
+stateDiagram-v2
+    [*] --> REQUESTED : Passenger confirms booking
+
+    REQUESTED --> ASSIGNED : Driver offered & accepted
+    REQUESTED --> NO_DRIVER_FOUND : No candidate / 3 consecutive timeouts
+    REQUESTED --> CANCELLED : Passenger cancels (free within 2 mins)
+
+    ASSIGNED --> DRIVER_EN_ROUTE : Driver accepts trip
+    ASSIGNED --> REQUESTED : Driver rejects or 30s timeout expires
+    ASSIGNED --> CANCELLED : Cancellation (fee applies)
+
+    DRIVER_EN_ROUTE --> ARRIVED : Driver reaches pickup location
+    DRIVER_EN_ROUTE --> CANCELLED : Cancellation (fee applies)
+
+    ARRIVED --> IN_PROGRESS : Driver starts trip (Passenger boarded)
+    ARRIVED --> CANCELLED : Passenger no-show after 5 mins (fee applies)
+
+    IN_PROGRESS --> COMPLETED : Driver completes trip at dropoff
+    IN_PROGRESS --> CANCELLED : Emergency cancellation
+
+    COMPLETED --> [*]
+    CANCELLED --> [*]
+    NO_DRIVER_FOUND --> [*]
+```
+
+---
+
+### 3. Driver Onboarding Activity Workflow (AD-2)
+*Source:* [`docs/uml/ViaMe_AD2_Onboarding.puml`](docs/uml/ViaMe_AD2_Onboarding.puml)
+
+```mermaid
+flowchart TD
+    Start([Driver Submits Personal Data + Licence]) --> SubVeh[Submit Vehicle Details: Plate, Make, Model, Seats]
+    SubVeh --> CheckUniq{Email, Phone, and Plate Unique?}
+    CheckUniq -- No --> ShowConflict[Show Conflict Error: DUPLICATE_EMAIL / PHONE / PLATE]
+    ShowConflict --> StopFail([Terminated])
+    CheckUniq -- Yes --> CreatePending[Create user PENDING + driver_profile PENDING + vehicle PENDING]
+    CreatePending --> AdminReview[Admin Reviews Official Documents]
+    AdminReview --> IsApproved{Approved?}
+    IsApproved -- Yes --> ApproveDriver[driver_profile.verification = APPROVED<br>vehicle.status = ACTIVE<br>Driver Can Go ONLINE]
+    ApproveDriver --> StopSuccess([Onboarding Complete])
+    IsApproved -- No --> RejectDriver[driver_profile.verification = REJECTED<br>vehicle.status = INACTIVE<br>Driver Notified with Reason]
+    RejectDriver --> StopReject([Application Rejected])
+```
+
+---
+
+### 4. Admin Dynamic Pricing Rule Configuration (AD-3)
+*Source:* [`docs/uml/ViaMe_AD3_Pricing.puml`](docs/uml/ViaMe_AD3_Pricing.puml)
+
+```mermaid
+flowchart TD
+    Start([Admin Opens Pricing Screen]) --> EditValues[Admin Edits baseFare, perKm, perMin, surgeMultiplier]
+    EditValues --> ValidateValues{Validation Passes?<br>All values >= 0<br>Surge between 1.0 and 3.0}
+    ValidateValues -- Yes --> DeactCurrent[Deactivate Current Active Pricing Rule]
+    DeactCurrent --> InsertNew[Insert New pricing_rule Record with validFrom = NOW]
+    InsertNew --> WriteAudit[Write Audit Log Entry with Admin ID]
+    WriteAudit --> ApplyNew[New Rides Automatically Use the New Rule]
+    ApplyNew --> StopSuccess([Configuration Complete])
+    ValidateValues -- No --> ShowError[Show Inline Validation Error]
+    ShowError --> RestoreOld[Restore Previous Configuration Values]
+    RestoreOld --> StopError([Aborted])
+```
+
+---
+
+## 🚀 Getting Started & Database Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/emmanueloyono-debug/ViaMe.git
+   cd ViaMe
+   ```
+
+2. **Initialize the MySQL Database:**
+   ```bash
+   mysql -u root -p < database/schema.sql
+   ```
+
+3. **Build the Application:**
+   ```bash
+   mvn clean compile
+   ```
+
+4. **Launch the JavaFX Multi-Role Simulation:**
+   ```bash
+   mvn javafx:run
+   ```
+
+For complete technical specifications, 10 use case flows, and defense Q&A, refer to **[VIAME_PROJECT_SPECIFICATION.md](VIAME_PROJECT_SPECIFICATION.md)**.
