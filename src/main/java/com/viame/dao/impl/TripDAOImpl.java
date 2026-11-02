@@ -1,6 +1,7 @@
 package com.viame.dao.impl;
 
 import com.viame.dao.DBConnection;
+import com.viame.dao.TransactionManager;
 import com.viame.dao.TripDAO;
 import com.viame.exception.DatabaseException;
 import com.viame.model.Trip;
@@ -12,6 +13,16 @@ import java.util.List;
 import java.util.Optional;
 
 public class TripDAOImpl implements TripDAO {
+
+    private final TransactionManager transactionManager;
+
+    public TripDAOImpl() {
+        this(new TransactionManager());
+    }
+
+    public TripDAOImpl(TransactionManager transactionManager) {
+        this.transactionManager = transactionManager;
+    }
 
     @Override
     public Optional<Trip> findById(Long id) {
@@ -48,6 +59,15 @@ public class TripDAOImpl implements TripDAO {
 
     @Override
     public Trip save(Trip trip) {
+        try (Connection conn = DBConnection.getInstance().getConnection()) {
+            return insert(conn, trip);
+        } catch (SQLException e) {
+            throw new DatabaseException("Error persisting new trip", e);
+        }
+    }
+
+    @Override
+    public Trip insert(Connection conn, Trip trip) throws SQLException {
         String sql = """
             INSERT INTO ride (passenger_id, driver_id, vehicle_id, pricing_rule_id,
                               pickup_lat, pickup_lng, pickup_address,
@@ -55,8 +75,7 @@ public class TripDAOImpl implements TripDAO {
                               distance_km, duration_min, status, version)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """;
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setLong(1, trip.getPassengerId());
             if (trip.getDriverId() != null) stmt.setLong(2, trip.getDriverId()); else stmt.setNull(2, Types.BIGINT);
             if (trip.getVehicleId() != null) stmt.setLong(3, trip.getVehicleId()); else stmt.setNull(3, Types.BIGINT);
@@ -79,21 +98,27 @@ public class TripDAOImpl implements TripDAO {
                 }
             }
             return trip;
-        } catch (SQLException e) {
-            throw new DatabaseException("Error persisting new trip", e);
         }
     }
 
     @Override
     public boolean update(Trip trip) {
+        try (Connection conn = DBConnection.getInstance().getConnection()) {
+            return update(conn, trip);
+        } catch (SQLException e) {
+            throw new DatabaseException("Error updating trip with id: " + trip.getId(), e);
+        }
+    }
+
+    @Override
+    public boolean update(Connection conn, Trip trip) throws SQLException {
         String sql = """
             UPDATE ride SET driver_id = ?, vehicle_id = ?, status = ?,
                             accepted_at = ?, started_at = ?, completed_at = ?, cancelled_at = ?,
                             version = version + 1
             WHERE id = ? AND version = ?
         """;
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             if (trip.getDriverId() != null) stmt.setLong(1, trip.getDriverId()); else stmt.setNull(1, Types.BIGINT);
             if (trip.getVehicleId() != null) stmt.setLong(2, trip.getVehicleId()); else stmt.setNull(2, Types.BIGINT);
             stmt.setString(3, trip.getStatus().name());
@@ -110,8 +135,6 @@ public class TripDAOImpl implements TripDAO {
                 return true;
             }
             return false;
-        } catch (SQLException e) {
-            throw new DatabaseException("Error updating trip with id: " + trip.getId(), e);
         }
     }
 
@@ -184,19 +207,28 @@ public class TripDAOImpl implements TripDAO {
     @Override
     public boolean lockAndAssignTrip(long tripId, long driverId, long vehicleId) {
         String selectLock = "SELECT status, version FROM ride WHERE id = ? FOR UPDATE";
+        String selectDriverLock = "SELECT availability FROM driver_profile WHERE user_id = ? FOR UPDATE";
         String updateTrip = "UPDATE ride SET status = 'ASSIGNED', driver_id = ?, vehicle_id = ?, accepted_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = ?";
         String updateDriver = "UPDATE driver_profile SET availability = 'ON_TRIP' WHERE user_id = ?";
 
-        Connection conn = DBConnection.getInstance().getConnection();
-        try {
-            conn.setAutoCommit(false); // Begin ACID transaction
-
+        // Single ACID transaction; on early "return false" nothing has been written, so the
+        // commit simply releases the row locks.
+        return transactionManager.inTransaction(conn -> {
             try (PreparedStatement lockStmt = conn.prepareStatement(selectLock)) {
                 lockStmt.setLong(1, tripId);
                 try (ResultSet rs = lockStmt.executeQuery()) {
                     if (!rs.next() || !TripStatus.REQUESTED.name().equals(rs.getString("status"))) {
-                        conn.rollback();
                         return false; // Trip was already accepted by another driver or cancelled
+                    }
+                }
+            }
+
+            // Lock the driver row too: prevents the same driver accepting two trips concurrently
+            try (PreparedStatement drvLock = conn.prepareStatement(selectDriverLock)) {
+                drvLock.setLong(1, driverId);
+                try (ResultSet rs = drvLock.executeQuery()) {
+                    if (!rs.next() || !"ONLINE".equals(rs.getString("availability"))) {
+                        return false; // Driver is offline or already on another trip
                     }
                 }
             }
@@ -210,15 +242,41 @@ public class TripDAOImpl implements TripDAO {
 
                 drvStmt.setLong(1, driverId);
                 drvStmt.executeUpdate();
-
-                conn.commit();
                 return true;
             }
+        });
+    }
+
+    @Override
+    public Optional<Trip> findActiveByPassengerId(long passengerId) {
+        String sql = """
+            SELECT * FROM ride
+            WHERE passenger_id = ?
+              AND status IN ('REQUESTED', 'ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS')
+            ORDER BY requested_at DESC LIMIT 1
+        """;
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, passengerId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() ? Optional.of(mapResultSetToTrip(rs)) : Optional.empty();
+            }
         } catch (SQLException e) {
-            try { conn.rollback(); } catch (SQLException ignored) {}
-            throw new DatabaseException("Transaction failed: Lock and assign trip " + tripId, e);
-        } finally {
-            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}
+            throw new DatabaseException("Error fetching active trip for passenger: " + passengerId, e);
+        }
+    }
+
+    @Override
+    public int countByStatus(TripStatus status) {
+        String sql = "SELECT COUNT(*) FROM ride WHERE status = ?";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, status.name());
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException("Error counting trips by status: " + status, e);
         }
     }
 
