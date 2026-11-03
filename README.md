@@ -11,15 +11,15 @@
 
 ## 👥 Engineering Team & Task Allocation Matrix (Group of 4)
 
-> **Current System Status:** **~75% Overall Completion** achieved through Sprints 1 & 2.  
-> **Student 2 (Software Architect & Backend Core Engineer)** has delivered the entire 5-tier backend foundation, all 11 DAOs, 8 business services, security infrastructure, JavaFX `MainApp` launcher, authentication views, and 25 passing unit tests.
+> **Current System Status:** **~85% Overall Completion** achieved through Sprints 1, 2, and Backend Core Completion.  
+> **Student 2 (Software Architect & Backend Core Engineer)** has delivered the entire 5-tier backend foundation, all 12 DAOs, 9 business services (including `ReportService`), security infrastructure, JavaFX `MainApp` launcher, authentication views, **`RestApiServer` with 17 REST endpoints**, 34 passing unit tests, and the `TC-CONC-01` multi-threaded double-acceptance test.
 
 | Role & Focus | Assigned Student | Current Status & Core Deliverables | Next Actions To Complete |
 | :--- | :--- | :--- | :--- |
 | **Student 1: System Analyst & Database Engineer** | *Team Member 1* | **100% Completed:** 10 Use Case specifications, Conceptual ERD, 3NF Normalization justification, and runnable `database/schema.sql` with triggers & verified seed data. | • Maintain local MySQL 8.0 database instance.<br>• Defend 3NF Normalization proofs and trigger logic during oral defense. |
-| **Student 2: Software Architect & Backend Core Engineer** | *Student 2 (Lead Engineer)* | **75% Completed (Sprints 1 & 2 Done):**<br>• Full 5-tier architecture & domain models (`User`, `Passenger`, `Driver`, `Trip`, `Fare`, `Payment`, etc.).<br>• Complete DAO Layer: `UserDAO`, `PassengerDAO`, `DriverDAO`, `VehicleDAO`, `TripDAO`, `PaymentDAO`, `PricingRuleDAO`, `FareDAO`, `RatingDAO`, `AuditLogDAO`, and `TransactionManager`.<br>• Full Service Layer: `AuthenticationService` (BCrypt), `TripService` (pessimistic locking & state machine), `FareCalculationService` (dynamic surge strategy), `DriverMatchingService` (Haversine), `PaymentService` (ACID wallet & cash settlement), `RatingService`, `CancellationPolicy`.<br>• **REST API Server (`RestApiServer.java`):** Standard HTTP REST endpoints enabling **Android $\to$ REST API $\to$ Java backend $\to$ MySQL** without direct DB coupling.<br>• Desktop Application Shell: `MainApp.java`, `styles.css`, `LoginView.fxml`, `RegisterView.fxml`, and 26 passing unit tests. | • Assist team with backend service & REST API integration.<br>• Code-review BI analytical SQL aggregate queries. |
+| **Student 2: Software Architect & Backend Core Engineer** | *Student 2 (Lead Engineer)* | **85% Completed (Core Backend & BI Done):**<br>• Full 5-tier architecture & domain models (`User`, `Passenger`, `Driver`, `Trip`, `Fare`, `Payment`, `ReportRows`, etc.).<br>• Complete DAO Layer (12 DAOs): `UserDAO`, `PassengerDAO`, `DriverDAO`, `VehicleDAO`, `TripDAO`, `PaymentDAO`, `PricingRuleDAO`, `FareDAO`, `RatingDAO`, `AuditLogDAO`, `ReportDAO`, and `TransactionManager`.<br>• Full Service Layer (9 Services): `AuthenticationService` (BCrypt), `TripService` (pessimistic locking & state machine), `FareCalculationService` (dynamic surge strategy), `DriverMatchingService` (Haversine), `PaymentService` (ACID wallet & cash settlement), `RatingService`, `CancellationPolicy`, `ReportService` (5 BI reports + RFC-4180 CSV export).<br>• **REST API Server (`RestApiServer.java`):** 17 standard HTTP REST endpoints enabling **Android $\to$ REST API $\to$ Java backend $\to$ MySQL** without direct DB coupling.<br>• Full Test Suite: 34 unit tests passing with 100% success rate + `TC-CONC-01` multi-threaded race condition test.<br>• Desktop Application Shell: `MainApp.java`, `styles.css`, `LoginView.fxml`, `RegisterView.fxml`. | • Assist team with Android REST client integration.<br>• Support UI team connecting JavaFX `BarChart`/`PieChart` to `ReportService`. |
 | **Student 3: UI/UX & Mobile / Desktop Application Developer** | *Team Member 3* | **Ready for Sprint 3 (Part 1 of Remaining Work):** Desktop FXML layout shells and controller classes created; REST API endpoints live. | **Execute Part 1 (Sprint 3):**<br>• Build Android app (or Java GUI client) connecting via REST API: Passenger screen (registration, route estimation, booking, wallet, rating) and Driver screen (duty toggle, incoming radar alert, sequential state actions).<br>• Or finalize interactive JavaFX simulation client for Passenger and Driver views consuming backend services. |
-| **Student 4: QA, Security & Deployment Engineer** | *Team Member 4* | **Ready for Sprint 4 & 5 (Parts 2 & 3 of Remaining Work):** BCrypt authentication & base unit test suite established. | **Execute Parts 2 & 3 (Sprints 4 & 5):**<br>• Implement `ReportService` & embed 5 Business Intelligence analytical charts (`BarChart`, `PieChart`, `LineChart`) in `AdminConsole.fxml`.<br>• Implement driver verification (`AD-2`) and pricing rule configurator (`AD-3`).<br>• Execute multi-threaded concurrency test (`TC-CONC-01`) and prepare oral defense presentation deck. |
+| **Student 4: QA, Security & Deployment Engineer** | *Team Member 4* | **Ready for Sprints 4 & 5 (Parts 2 & 3 of Remaining Work):** Backend `ReportService` and `TC-CONC-01` concurrency harness ready. | **Execute Parts 2 & 3 (Sprints 4 & 5):**<br>• Embed visual charts (`BarChart`, `PieChart`, `LineChart`) into `AdminConsole.fxml` wired to `ReportService`.<br>• Implement driver verification (`AD-2`) and pricing rule configurator (`AD-3`) UI actions in `AdminConsole`.<br>• Prepare oral defense presentation slide deck. |
 
 ---
 
@@ -115,6 +115,28 @@ graph LR
 2. **Java REST API & Backend Server (Student 2):**
    - Central business logic host: BCrypt authentication, fare strategy, dispatch matching, and ACID transactions.
    - Built-in lightweight [`RestApiServer.java`](src/main/java/com/viame/api/RestApiServer.java) running on port `8080` without external dependency bloat.
+   - **REST API Endpoints Specification:**
+
+     | Category | Method & Path | Query / Body Parameters | Response Description |
+     | :--- | :--- | :--- | :--- |
+     | **System** | `GET /api/health` | None | System status and service health check (`{"status":"UP"}`) |
+     | **Auth** | `POST /api/auth/login` | `{"email": "...", "password": "..."}` | Session token, user ID, role, and profile info |
+     | **Auth** | `POST /api/auth/register/passenger` | `{"email": "...", "password": "...", "phone": "...", "fullName": "..."}` | Registered passenger ID and initial wallet |
+     | **Auth** | `POST /api/auth/register/driver` | `{"email": "...", "password": "...", "phone": "...", "fullName": "...", "licence": "...", "plate": "...", "make": "...", "model": "..."}` | Registered driver ID with `PENDING` verification status |
+     | **Fare** | `POST /api/fare/estimate` | `{"pickupLat": 4.05, "pickupLng": 9.76, "dropoffLat": 4.07, "dropoffLng": 9.71}` | Distance (km), duration (min), surge multiplier, estimated fare |
+     | **Dispatch** | `GET /api/drivers/available` | `?lat=4.05&lng=9.76&radius=5.0` | List of nearby online drivers with GPS coordinates and ratings |
+     | **Trips** | `POST /api/trips/request` | `{"passengerId": 1, "pickupLat": ..., "dropoffLat": ..., "paymentMethod": "CASH"}` | Created trip record with `REQUESTED` status |
+     | **Trips** | `POST /api/trips/accept` | `{"tripId": 10, "driverId": 2, "vehicleId": 1}` | Pessimistic locking assignment (`200 OK` or `409 Conflict`) |
+     | **Trips** | `POST /api/trips/status` | `{"tripId": 10, "status": "IN_PROGRESS"}` | Advances trip state machine (`EN_ROUTE`, `ARRIVED`, `COMPLETED`) |
+     | **Trips** | `POST /api/trips/cancel` | `{"tripId": 10, "cancelledBy": "PASSENGER", "reason": "..."}` | Cancels trip with grace period fee logic |
+     | **Wallet** | `POST /api/wallet/topup` | `{"passengerId": 1, "amount": 5000.00}` | Updated wallet balance after atomic transaction |
+     | **BI Reports** | `GET /api/reports/revenue` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Daily gross revenue, 20% platform commission, 80% driver payout |
+     | **BI Reports** | `GET /api/reports/drivers` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Trips completed, cancellations, completion rate %, ratings, gross |
+     | **BI Reports** | `GET /api/reports/peak-hours` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Hourly demand histogram (0–23h), completion rate, avg surge |
+     | **BI Reports** | `GET /api/reports/pickup-zones` | `?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=10` | Top high-demand pickup locations ranked by request volume |
+     | **BI Reports** | `GET /api/reports/cancellations` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Breakdown by cancelling party, avg minutes to cancel, lost revenue |
+     | **BI Reports** | `GET /api/reports/loyalty` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Customer lifetime spend, completed rides, wallet adoption %, tier (Gold/Silver/Bronze) |
+
 3. **Desktop JavaFX Console (Students 3 & 4):**
    - For **Administrators & Dispatchers** to monitor the fleet in real time, verify driver documents (`AD-2`), update dynamic surge pricing tariffs (`AD-3`), and generate the **5 Business Intelligence Reports** with visual charts (`BarChart`, `PieChart`, `LineChart`).
    - Doubles as an in-class **Multi-Role Desktop Simulation** suite where examiners can test the Passenger, Driver, and Admin roles side by side on one PC.

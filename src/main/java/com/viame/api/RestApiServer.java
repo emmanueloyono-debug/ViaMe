@@ -16,7 +16,9 @@ import com.viame.service.DriverMatchingService;
 import com.viame.service.FareCalculationService;
 import com.viame.service.FareQuote;
 import com.viame.service.PaymentService;
+import com.viame.service.ReportService;
 import com.viame.service.TripService;
+import com.viame.util.JsonUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,9 +26,13 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
@@ -40,12 +46,57 @@ public class RestApiServer {
 
     private final int port;
     private HttpServer server;
+    private ExecutorService executor;
 
     private final AuthenticationService authService = new AuthenticationService();
     private final TripService tripService = new TripService();
     private final FareCalculationService fareService = new FareCalculationService();
     private final PaymentService paymentService = new PaymentService();
     private final DriverMatchingService driverMatchingService = new DriverMatchingService();
+    private final ReportService reportService = new ReportService();
+
+    @FunctionalInterface
+    private interface ReportQuery {
+        List<? extends Record> run(LocalDate from, LocalDate to, Map<String, String> params);
+    }
+
+    /**
+     * Generic GET handler for BI reports. Defaults to the last 30 days when no range is given.
+     * Response: {"from":..,"to":..,"count":n,"rows":[...]}
+     */
+    private class ReportHandler implements HttpHandler {
+        private final ReportQuery query;
+
+        ReportHandler(ReportQuery query) {
+            this.query = query;
+        }
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            try {
+                Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
+                LocalDate to = params.containsKey("to") ? LocalDate.parse(params.get("to")) : LocalDate.now();
+                LocalDate from = params.containsKey("from") ? LocalDate.parse(params.get("from")) : to.minusDays(30);
+                List<? extends Record> rows = query.run(from, to, params);
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("from", from);
+                body.put("to", to);
+                body.put("count", rows.size());
+                body.put("rows", rows);
+                sendResponse(exchange, 200, JsonUtil.toJson(body));
+            } catch (DateTimeParseException | NumberFormatException e) {
+                sendResponse(exchange, 400, "{\"error\":\"Invalid parameter: " + escapeJson(e.getMessage()) + "\"}");
+            } catch (ValidationException e) {
+                sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                sendResponse(exchange, 500, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+            }
+        }
+    }
 
     public RestApiServer(int port) {
         this.port = port;
@@ -53,7 +104,12 @@ public class RestApiServer {
 
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(port), 0);
-        server.setExecutor(Executors.newFixedThreadPool(10));
+        executor = Executors.newFixedThreadPool(10, r -> {
+            Thread t = new Thread(r, "viame-http-worker");
+            t.setDaemon(true);
+            return t;
+        });
+        server.setExecutor(executor);
 
         // Health check endpoint
         server.createContext("/api/health", exchange -> {
@@ -78,6 +134,15 @@ public class RestApiServer {
         // 4. Wallet Endpoints
         server.createContext("/api/wallet/topup", new WalletTopupHandler());
 
+        // 5. Business Intelligence Report Endpoints (GET ?from=YYYY-MM-DD&to=YYYY-MM-DD)
+        server.createContext("/api/reports/revenue", new ReportHandler((f, t, p) -> reportService.dailyRevenue(f, t)));
+        server.createContext("/api/reports/drivers", new ReportHandler((f, t, p) -> reportService.driverPerformance(f, t)));
+        server.createContext("/api/reports/peak-hours", new ReportHandler((f, t, p) -> reportService.peakHours(f, t)));
+        server.createContext("/api/reports/pickup-zones", new ReportHandler((f, t, p) ->
+                reportService.topPickupZones(f, t, Integer.parseInt(p.getOrDefault("limit", "10")))));
+        server.createContext("/api/reports/cancellations", new ReportHandler((f, t, p) -> reportService.cancellations(f, t)));
+        server.createContext("/api/reports/loyalty", new ReportHandler((f, t, p) -> reportService.customerLoyalty(f, t)));
+
         server.start();
         System.out.println("ViaMe REST API Server listening on port " + port);
     }
@@ -85,6 +150,9 @@ public class RestApiServer {
     public void stop() {
         if (server != null) {
             server.stop(0);
+        }
+        if (executor != null) {
+            executor.shutdownNow();
         }
     }
 
@@ -394,3 +462,4 @@ public class RestApiServer {
         api.start();
     }
 }
+
