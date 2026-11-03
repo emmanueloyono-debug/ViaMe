@@ -18,19 +18,27 @@
 > 3. **Verification Before Merge:** Emmanuel Oyono will run automated verification and architectural audits using the Antigravity engine before any merge.
 > 4. **Only Emmanuel Oyono is authorized to merge Pull Requests into `main`.** Direct pushes to `main` will be rejected.
 
-### Your Branch Workflow:
+### 🚀 MANDATORY FIRST STEP: Update Your Local Repository
+Before opening your IDE or writing any code, pull the latest code and this guide into your local workspace:
 ```bash
-# 1. Checkout your working branch from latest main
+# 1. Switch to main and pull the latest backend and task files
 git checkout main
 git pull origin main
+
+# 2. Create and switch to your personal feature branch
 git checkout -b feature/simen-database-analysis
 
-# 2. Make your changes, test your SQL scripts
-# 3. Stage and commit with descriptive messages
+# 3. Verify that docs/tasks/STUDENT_1_SIMEN_DATABASE_GUIDE.md is present
+```
+
+### Your Daily Branch Workflow:
+```bash
+# 1. Make your changes and test your SQL scripts locally
+# 2. Stage and commit with descriptive messages
 git add database/schema.sql docs/
 git commit -m "docs(db): complete 3NF normalization proof, trigger verification, and expanded Douala seed data"
 
-# 4. Push to your branch and open a Pull Request
+# 3. Push to your branch and open a Pull Request
 git push -u origin feature/simen-database-analysis
 ```
 
@@ -93,9 +101,30 @@ Before opening your Pull Request for Emmanuel to review, verify:
 
 ---
 
-## 🤖 PREPARED PROMPT (IF USING AI ASSISTANTS)
+## 🤖 HOW TO USE AI ASSISTANTS (IN-IDE VS. WEB CHAT)
 
-If you use ChatGPT, Claude, Gemini, or GitHub Copilot to help you write SQL scripts, normalization proofs, or documentation, **copy and paste the following prompt verbatim**:
+Depending on whether you use an **In-IDE AI Assistant** (Cursor, Windsurf, GitHub Copilot in IntelliJ, Gemini in Android Studio) or a **Standalone Web Chat** (ChatGPT, Claude, Gemini Web), use the appropriate method below:
+
+### Option A: Using In-IDE AI (Cursor, Copilot, IntelliJ AI Assistant)
+Since the AI has direct access to your local files after running `git pull origin main`, you do **not** need to paste the entire project background. Simply point the in-IDE AI to this guide:
+
+1. **Keep open in IDE tabs:** `docs/tasks/STUDENT_1_SIMEN_DATABASE_GUIDE.md` and `database/schema.sql`.
+2. **In-IDE Prompt (Type in Copilot / Cursor Chat):**
+   ```text
+   @docs/tasks/STUDENT_1_SIMEN_DATABASE_GUIDE.md @database/schema.sql
+   You are acting as Student 1 (Simen, Database Engineer) on ViaMe.
+   Please implement Task 2: write docs/3NF_NORMALIZATION_JUSTIFICATION.md with formal 1NF, 2NF, and 3NF functional dependency equations (A -> B) justifying the schema. Do not change table or column names.
+   ```
+3. **For Douala Seed Data & Trigger Verification:**
+   ```text
+   @docs/tasks/STUDENT_1_SIMEN_DATABASE_GUIDE.md @database/schema.sql
+   Please expand the Douala seed data in database/schema.sql with the hotspots listed in my guide (Akwa, Bonanjo, Bonamoussadi, Makepe, Airport, Deido, Ndokoti) using verified BCrypt hashes ($2a$12$tBBD95yv.dV7CBE.MUZH5usNco5O9EJ4Wxx4y9FA54J.pf5zLPE1e).
+   ```
+
+---
+
+### Option B: Using Standalone Web Chat (ChatGPT, Claude, Gemini Web)
+If you copy code out of the IDE into a browser chat, **copy and paste this complete context prompt verbatim**:
 
 ```markdown
 You are an expert Database Architect and Systems Analyst assisting Student 1 (Simen) on the academic project "ViaMe: Intelligent Multi-Role Urban Transport & Taxi Booking System" (Java Programming II, Institut Saint Jean).
@@ -121,3 +150,4 @@ STRICT CONSTRAINTS:
 - Ensure all SQL scripts use standard MySQL 8.0 syntax with InnoDB engine and explicit foreign key constraints.
 - Output clean, professional markdown and SQL code ready for academic presentation and oral defense.
 ```
+

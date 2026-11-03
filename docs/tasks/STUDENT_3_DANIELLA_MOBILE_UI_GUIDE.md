@@ -18,19 +18,27 @@
 > 3. **Verification Before Merge:** Emmanuel Oyono will run automated build verification, UI unit tests, and endpoint integration checks using Antigravity before approving any merge.
 > 4. **Only Emmanuel Oyono is authorized to merge Pull Requests into `main`.** Direct pushes to `main` are blocked.
 
-### Your Branch Workflow:
+### 🚀 MANDATORY FIRST STEP: Update Your Local Repository
+Before opening Android Studio / IntelliJ or writing any code, pull the latest code and this guide into your local workspace:
 ```bash
-# 1. Checkout your working branch from latest main
+# 1. Switch to main and pull the latest backend and task files
 git checkout main
 git pull origin main
+
+# 2. Create and switch to your personal feature branch
 git checkout -b feature/daniella-mobile-ui
 
-# 2. Develop your Android and JavaFX screens, test them against RestApiServer
-# 3. Stage and commit with clean conventional commits
+# 3. Verify that docs/tasks/STUDENT_3_DANIELLA_MOBILE_UI_GUIDE.md is present
+```
+
+### Your Daily Branch Workflow:
+```bash
+# 1. Develop your Android and JavaFX screens, test them against RestApiServer
+# 2. Stage and commit with clean conventional commits
 git add android/ src/main/java/com/viame/controller/
 git commit -m "feat(ui): implement Android mobile client and wire JavaFX passenger/driver dashboards"
 
-# 4. Push to your branch and open a Pull Request
+# 3. Push to your branch and open a Pull Request
 git push -u origin feature/daniella-mobile-ui
 ```
 
@@ -122,9 +130,39 @@ Before opening your Pull Request for Emmanuel to review, verify:
 
 ---
 
-## 🤖 PREPARED PROMPT (IF USING AI ASSISTANTS)
+## 🤖 HOW TO USE AI ASSISTANTS (IN-IDE VS. WEB CHAT)
 
-If you use ChatGPT, Claude, Gemini, or GitHub Copilot to help you write Android or JavaFX code, **copy and paste the following prompt verbatim**:
+Depending on whether you use an **In-IDE AI Assistant** (Android Studio Gemini/Copilot, Cursor, IntelliJ AI Assistant) or a **Standalone Web Chat** (ChatGPT, Claude, Gemini Web), use the appropriate method below:
+
+### Option A: Using In-IDE AI (Android Studio, Cursor, Copilot)
+Because the AI has direct access to the repository once you run `git pull origin main`, you do **not** need to paste the whole architecture background. Keep `docs/tasks/STUDENT_3_DANIELLA_MOBILE_UI_GUIDE.md` and [`RestApiServer.java`](../../src/main/java/com/viame/api/RestApiServer.java) open in your editor and run these targeted prompts:
+
+1. **For the Android Retrofit Network Interface:**
+   ```text
+   @docs/tasks/STUDENT_3_DANIELLA_MOBILE_UI_GUIDE.md @RestApiServer.java
+   You are acting as Student 3 (Daniella) on ViaMe.
+   Generate the Retrofit 2 interface (ApiService.kt or ApiService.java) and request/response DTO classes matching the 17 REST endpoints in RestApiServer.java (BaseUrl: http://10.0.2.2:8080). Do not use any JDBC/MySQL drivers.
+   ```
+2. **For the Android Passenger Activity & Booking Flow:**
+   ```text
+   @docs/tasks/STUDENT_3_DANIELLA_MOBILE_UI_GUIDE.md
+   Generate the PassengerActivity layout and logic: Douala location dropdowns, fare estimate preview calling POST /api/fare/estimate, payment method selector (WALLET/CASH), booking call POST /api/trips/request, and live ride status progress bar.
+   ```
+3. **For the Android Driver Activity & Countdown Radar:**
+   ```text
+   @docs/tasks/STUDENT_3_DANIELLA_MOBILE_UI_GUIDE.md
+   Generate the DriverActivity: duty toggle switch (ONLINE/OFFLINE), incoming ride radar alert dialog with 30s CountDownTimer calling POST /api/trips/accept, and sequential state action buttons calling POST /api/trips/status.
+   ```
+4. **For Wiring JavaFX Dashboards:**
+   ```text
+   @docs/tasks/STUDENT_3_DANIELLA_MOBILE_UI_GUIDE.md @PassengerDashboardController.java @DriverDashboardController.java
+   Wire the JavaFX controllers to TripService, FareCalculationService, and PaymentService. Do not write raw SQL queries in controllers.
+   ```
+
+---
+
+### Option B: Using Standalone Web Chat (ChatGPT, Claude, Gemini Web)
+If you copy code out of the IDE into a browser chat, **copy and paste this complete context prompt verbatim**:
 
 ```markdown
 You are an expert Mobile & Desktop Frontend Engineer assisting Student 3 (Daniella) on the academic project "ViaMe: Intelligent Multi-Role Urban Transport & Taxi Booking System" (Java Programming II, Institut Saint Jean).
@@ -163,3 +201,4 @@ STRICT CONSTRAINTS:
 - ZERO raw SQL queries in JavaFX controllers (always call Services or DAOs).
 - Provide clean, robust error handling with user alerts for insufficient wallet balance and ride cancellation penalties.
 ```
+

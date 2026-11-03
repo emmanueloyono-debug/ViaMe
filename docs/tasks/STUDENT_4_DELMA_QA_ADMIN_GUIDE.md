@@ -18,19 +18,27 @@
 > 3. **Verification Before Merge:** Emmanuel Oyono will run automated test suites, check code formatting, and verify architectural integrity using Antigravity before approving any merge.
 > 4. **Only Emmanuel Oyono is authorized to merge Pull Requests into `main`.** Direct pushes to `main` are blocked.
 
-### Your Branch Workflow:
+### 🚀 MANDATORY FIRST STEP: Update Your Local Repository
+Before opening IntelliJ IDEA / Cursor or writing any code, pull the latest code and this guide into your local workspace:
 ```bash
-# 1. Checkout your working branch from latest main
+# 1. Switch to main and pull the latest backend and task files
 git checkout main
 git pull origin main
+
+# 2. Create and switch to your personal feature branch
 git checkout -b feature/delma-qa-admin
 
-# 2. Develop Admin UI, wire charts, write QA tests, and prepare defense slides
-# 3. Stage and commit with clean conventional commits
+# 3. Verify that docs/tasks/STUDENT_4_DELMA_QA_ADMIN_GUIDE.md is present
+```
+
+### Your Daily Branch Workflow:
+```bash
+# 1. Develop Admin UI, wire charts, write QA tests, and prepare defense slides
+# 2. Stage and commit with clean conventional commits
 git add src/main/java/com/viame/controller/AdminDashboardController.java src/main/resources/com/viame/views/AdminConsole.fxml docs/
 git commit -m "feat(admin): wire 5 BI visual charts, driver verification AD-2, tariff config AD-3, and defense slides"
 
-# 4. Push to your branch and open a Pull Request
+# 3. Push to your branch and open a Pull Request
 git push -u origin feature/delma-qa-admin
 ```
 
@@ -125,9 +133,41 @@ Before opening your Pull Request for Emmanuel to review, verify:
 
 ---
 
-## 🤖 PREPARED PROMPT (IF USING AI ASSISTANTS)
+## 🤖 HOW TO USE AI ASSISTANTS (IN-IDE VS. WEB CHAT)
 
-If you use ChatGPT, Claude, Gemini, or GitHub Copilot to help you write JavaFX charts, admin workflows, or defense slides, **copy and paste the following prompt verbatim**:
+Depending on whether you use an **In-IDE AI Assistant** (IntelliJ IDEA AI Assistant, GitHub Copilot, Cursor, Windsurf) or a **Standalone Web Chat** (ChatGPT, Claude, Gemini Web), use the appropriate method below:
+
+### Option A: Using In-IDE AI (IntelliJ IDEA, Cursor, Copilot)
+Because the AI directly reads your local files once you run `git pull origin main`, you do **not** need to paste the entire architecture context. Keep `docs/tasks/STUDENT_4_DELMA_QA_ADMIN_GUIDE.md`, [`ReportService.java`](../../src/main/java/com/viame/service/ReportService.java), and [`AdminDashboardController.java`](../../src/main/java/com/viame/controller/AdminDashboardController.java) open in your tabs:
+
+1. **For Wiring the 5 BI JavaFX Charts to ReportService:**
+   ```text
+   @docs/tasks/STUDENT_4_DELMA_QA_ADMIN_GUIDE.md @ReportService.java @AdminDashboardController.java @AdminConsole.fxml
+   You are acting as Student 4 (Delma) on ViaMe.
+   Wire the 5 BI visual charts in AdminDashboardController.java to ReportService:
+   - BarChart for daily revenue (Platform commission 20% vs driver payout 80%)
+   - LineChart for hourly peak demand (0-23h)
+   - TableView for driver performance ranking
+   - PieChart for trip cancellations
+   - BarChart for customer loyalty tiers (Gold, Silver, Bronze)
+   - Add CSV export actions calling ReportService.toCsv(...) with FileChooser.
+   Do not write raw SQL in controllers.
+   ```
+2. **For Driver Verification (AD-2) & Dynamic Pricing Configurator (AD-3):**
+   ```text
+   @docs/tasks/STUDENT_4_DELMA_QA_ADMIN_GUIDE.md @AdminDashboardController.java @DriverDAO.java @VehicleDAO.java @PricingRuleDAO.java
+   Implement the driver document approval workflow (AD-2) and the dynamic tariff modifier form (AD-3). Ensure changes write audit log records and validate that surge is between 1.00 and 3.00.
+   ```
+3. **For the Oral Defense Presentation Slides:**
+   ```text
+   @docs/tasks/STUDENT_4_DELMA_QA_ADMIN_GUIDE.md
+   Generate docs/defense/ORAL_DEFENSE_PRESENTATION.md with structured slides answering the 5 examination rubric questions: OOP tenets, pessimistic row locking (SELECT ... FOR UPDATE), SQL injection neutralization, 3NF normalization justification, and ACID transaction atomicity.
+   ```
+
+---
+
+### Option B: Using Standalone Web Chat (ChatGPT, Claude, Gemini Web)
+If you copy code out of the IDE into a browser chat, **copy and paste this complete context prompt verbatim**:
 
 ```markdown
 You are an expert JavaFX & Quality Assurance Engineer assisting Student 4 (Delma) on the academic project "ViaMe: Intelligent Multi-Role Urban Transport & Taxi Booking System" (Java Programming II, Institut Saint Jean).
@@ -158,3 +198,4 @@ STRICT CONSTRAINTS:
 - Ensure JavaFX charts execute calculations cleanly without freezing the UI thread.
 - Maintain compatibility with Java 21 and OpenJFX 17+.
 ```
+
