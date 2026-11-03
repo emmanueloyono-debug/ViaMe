@@ -202,7 +202,7 @@ BEGIN
         WHERE ratee_id = NEW.ratee_id;
         
         UPDATE driver_profile
-        SET rating_avg = ROUND(avg_score, 2)
+        SET rating_avg = GREATEST(1.00, LEAST(5.00, ROUND(avg_score, 2)))
         WHERE user_id = NEW.ratee_id;
     END IF;
 END //
@@ -265,3 +265,27 @@ INSERT INTO rating (id, ride_id, rater_id, ratee_id, score, comment, created_at)
 INSERT INTO audit_log (id, user_id, action, entity, entity_id, created_at) VALUES
 (1, 1, 'SYSTEM_INIT', 'DATABASE', NULL, '2026-10-25 00:00:00'),
 (2, 1, 'PRICING_RULE_CREATE', 'pricing_rule', 1, '2026-10-25 00:05:00');
+-- 11. Additional Douala rides (Ndokoti, Deido, Airport) - mix of WALLET and CASH
+INSERT INTO ride (id, passenger_id, driver_id, vehicle_id, pricing_rule_id, pickup_lat, pickup_lng, pickup_address, dropoff_lat, dropoff_lng, dropoff_address, distance_km, duration_min, status, requested_at, accepted_at, started_at, completed_at, version) VALUES
+(3, 4, 2, 1, 1, 4.045000, 9.742000, 'Ndokoti Intersection, Douala', 4.006111, 9.719444, 'Douala International Airport', 6.50, 18, 'COMPLETED', '2026-10-28 07:45:00', '2026-10-28 07:46:10', '2026-10-28 07:51:00', '2026-10-28 08:09:00', 4),
+(4, 5, 3, 2, 1, 4.062500, 9.711111, 'Deido Grand Moulin, Douala', 4.051056, 9.767869, 'Akwa Palace Hotel, Douala', 8.40, 24, 'COMPLETED', '2026-10-28 17:30:00', '2026-10-28 17:31:00', '2026-10-28 17:36:00', '2026-10-28 18:00:00', 4),
+(5, 4, 2, 1, 1, 4.092100, 9.735400, 'Makepe Saint Tropez, Douala', 4.006111, 9.719444, 'Douala International Airport', 12.70, 35, 'COMPLETED', '2026-10-30 12:15:00', '2026-10-30 12:16:00', '2026-10-30 12:22:00', '2026-10-30 12:57:00', 4);
+
+-- 12. Fares (rule 1: base 500 + 200/km + 25/min, surge 1.00)
+INSERT INTO fare (id, ride_id, base_fare, distance_component, time_component, surge_multiplier, total_amount, currency) VALUES
+(3, 3, 500.00, 1300.00, 450.00, 1.00, 2250.00, 'XAF'),
+(4, 4, 500.00, 1680.00, 600.00, 1.00, 2780.00, 'XAF'),
+(5, 5, 500.00, 2540.00, 875.00, 1.00, 3915.00, 'XAF');
+
+-- 13. Payments
+INSERT INTO payment (id, ride_id, amount, method, status, transaction_ref, paid_at) VALUES
+(3, 3, 2250.00, 'WALLET', 'PAID', 'TXN-20261028-001', '2026-10-28 08:09:15'),
+(4, 4, 2780.00, 'CASH',   'PAID', 'TXN-20261028-002', '2026-10-28 18:00:30'),
+(5, 5, 3915.00, 'WALLET', 'PAID', 'TXN-20261030-001', '2026-10-30 12:57:15');
+
+-- 14. Ratings (the trigger recalculates driver averages; rating 6 is driver -> passenger)
+INSERT INTO rating (id, ride_id, rater_id, ratee_id, score, comment, created_at) VALUES
+(3, 3, 4, 2, 5, 'Fast ride to the airport, very professional.', '2026-10-28 08:12:00'),
+(4, 4, 5, 3, 3, 'Okay ride, a bit slow in traffic.', '2026-10-28 18:05:00'),
+(5, 5, 4, 2, 4, 'Good driver, comfortable car.', '2026-10-30 13:00:00'),
+(6, 3, 2, 4, 5, 'Polite passenger, on time.', '2026-10-28 08:15:00');

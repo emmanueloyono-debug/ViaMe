@@ -1,5 +1,5 @@
 @startuml ViaMe_ERD
-title ViaMe — Conceptual ERD (physical implementation uses snake_case tables)
+title ViaMe — Physical Relational ERD (InnoDB 3NF Architecture)
 
 hide methods
 hide stereotypes
@@ -13,7 +13,7 @@ skinparam entity {
 }
 
 entity "user" as USER {
-  * id           : BIGINT <<PK>>
+  * id           : BIGINT <<PK, AUTO_INCREMENT>>
   --
   * email        : VARCHAR(150) <<UK>>
   * phone        : VARCHAR(20)  <<UK>>
@@ -21,7 +21,7 @@ entity "user" as USER {
   * password_salt : VARCHAR(64)
   * role         : ENUM('PASSENGER','DRIVER','ADMIN')
   * status       : ENUM('ACTIVE','PENDING','SUSPENDED')
-  * created_at   : DATETIME
+  * created_at   : TIMESTAMP
 }
 
 entity "passenger_profile" as PP {
@@ -29,6 +29,7 @@ entity "passenger_profile" as PP {
   --
   * full_name            : VARCHAR(120)
     default_payment_method : VARCHAR(20)
+  * wallet_balance       : DECIMAL(10,2)
 }
 
 entity "driver_profile" as DP {
@@ -39,12 +40,15 @@ entity "driver_profile" as DP {
   * verification_status   : ENUM('PENDING','APPROVED','REJECTED')
     rating_avg            : DECIMAL(3,2)
   * availability          : ENUM('ONLINE','OFFLINE','ON_TRIP')
+    current_lat           : DECIMAL(9,6)
+    current_lng           : DECIMAL(9,6)
+  * total_earnings        : DECIMAL(12,2)
 }
 
 entity "vehicle" as VEH {
-  * id           : BIGINT <<PK>>
+  * id           : BIGINT <<PK, AUTO_INCREMENT>>
   --
-  * driver_id    : BIGINT <<FK>>
+  * driver_id    : BIGINT <<FK, UK>>
   * plate_number : VARCHAR(20) <<UK>>
   * make         : VARCHAR(40)
   * model        : VARCHAR(40)
@@ -53,67 +57,67 @@ entity "vehicle" as VEH {
 }
 
 entity "ride" as RIDE {
-  * id             : BIGINT <<PK>>
+  * id              : BIGINT <<PK, AUTO_INCREMENT>>
   --
-  * passenger_id   : BIGINT <<FK>>
-    driver_id      : BIGINT <<FK>>
-    vehicle_id     : BIGINT <<FK>>
+  * passenger_id    : BIGINT <<FK>>
+    driver_id       : BIGINT <<FK>>
+    vehicle_id      : BIGINT <<FK>>
   * pricing_rule_id : BIGINT <<FK>>
-  * pickup_lat     : DECIMAL(9,6)
-  * pickup_lng     : DECIMAL(9,6)
-  * pickup_address : VARCHAR(255)
-  * dropoff_lat    : DECIMAL(9,6)
-  * dropoff_lng    : DECIMAL(9,6)
+  * pickup_lat      : DECIMAL(9,6)
+  * pickup_lng      : DECIMAL(9,6)
+  * pickup_address  : VARCHAR(255)
+  * dropoff_lat     : DECIMAL(9,6)
+  * dropoff_lng     : DECIMAL(9,6)
   * dropoff_address : VARCHAR(255)
-  * distance_km    : DECIMAL(6,2)
-  * duration_min   : INT
-  * status         : ENUM('REQUESTED','ASSIGNED','DRIVER_EN_ROUTE',
-                          'ARRIVED','IN_PROGRESS','COMPLETED',
-                          'CANCELLED','NO_DRIVER_FOUND')
-  * requested_at   : DATETIME
-    accepted_at    : DATETIME
-    started_at     : DATETIME
-    completed_at   : DATETIME
-    cancelled_at   : DATETIME
-  * version        : INT
+  * distance_km     : DECIMAL(6,2)
+  * duration_min    : INT
+  * status          : ENUM('REQUESTED','ASSIGNED','DRIVER_EN_ROUTE',
+                           'ARRIVED','IN_PROGRESS','COMPLETED',
+                           'CANCELLED','NO_DRIVER_FOUND')
+  * requested_at    : TIMESTAMP
+    accepted_at     : TIMESTAMP
+    started_at      : TIMESTAMP
+    completed_at    : TIMESTAMP
+    cancelled_at    : TIMESTAMP
+  * version         : INT
 }
 
 entity "fare" as FARE {
-  * id                : BIGINT <<PK>>
+  * id                 : BIGINT <<PK, AUTO_INCREMENT>>
   --
-  * ride_id           : BIGINT <<FK, UK>>
-  * base_fare         : DECIMAL(10,2)
-  * distance_component: DECIMAL(10,2)
-  * time_component    : DECIMAL(10,2)
-  * surge_multiplier  : DECIMAL(4,2)
-  * total_amount      : DECIMAL(10,2)
-  * currency          : VARCHAR(3)
+  * ride_id            : BIGINT <<FK, UK>>
+  * base_fare          : DECIMAL(10,2)
+  * distance_component : DECIMAL(10,2)
+  * time_component     : DECIMAL(10,2)
+  * surge_multiplier   : DECIMAL(4,2)
+  * total_amount       : DECIMAL(10,2)
+  * currency           : VARCHAR(3)
 }
 
 entity "payment" as PAY {
-  * id              : BIGINT <<PK>>
+  * id              : BIGINT <<PK, AUTO_INCREMENT>>
   --
   * ride_id         : BIGINT <<FK>>
   * amount          : DECIMAL(10,2)
-  * method          : ENUM('CARD','MOBILE_MONEY')
+  * method          : ENUM('CARD','MOBILE_MONEY','CASH','WALLET')
   * status          : ENUM('PENDING','PAID','FAILED','REFUNDED')
     transaction_ref : VARCHAR(80) <<UK>>
-    paid_at         : DATETIME
+    paid_at         : TIMESTAMP
 }
 
 entity "rating" as RAT {
-  * id         : BIGINT <<PK>>
+  * id         : BIGINT <<PK, AUTO_INCREMENT>>
   --
   * ride_id    : BIGINT <<FK>>
   * rater_id   : BIGINT <<FK>>
   * ratee_id   : BIGINT <<FK>>
   * score      : TINYINT
     comment    : VARCHAR(500)
-  * created_at : DATETIME
+  * created_at : TIMESTAMP
 }
 
 entity "pricing_rule" as PR {
-  * id               : BIGINT <<PK>>
+  * id               : BIGINT <<PK, AUTO_INCREMENT>>
   --
   * name             : VARCHAR(60)
   * base_fare        : DECIMAL(10,2)
@@ -121,41 +125,43 @@ entity "pricing_rule" as PR {
   * per_min          : DECIMAL(10,2)
   * surge_multiplier : DECIMAL(4,2)
   * active           : BOOLEAN
-  * valid_from       : DATETIME
+  * valid_from       : TIMESTAMP
 }
 
 entity "session" as SESS {
   * token_hash : VARCHAR(64) <<PK>>
   --
   * user_id    : BIGINT <<FK>>
-  * expires_at : DATETIME
+  * expires_at : TIMESTAMP
     ip_address : VARCHAR(45)
 }
 
 entity "audit_log" as AUD {
-  * id         : BIGINT <<PK>>
+  * id         : BIGINT <<PK, AUTO_INCREMENT>>
   --
     user_id    : BIGINT <<FK>>
   * action     : VARCHAR(60)
     entity     : VARCHAR(40)
     entity_id  : BIGINT
-  * created_at : DATETIME
+  * created_at : TIMESTAMP
 }
 
-' ----- Relationships (crow's foot) -----
-USER ||--o| PP    : "is a passenger"
-USER ||--o| DP    : "is a driver"
-USER ||--o{ SESS  : "authenticates"
-USER ||--o{ AUD   : "generates"
+' ----- Relationships (crow's foot with referential integrity rules) -----
+USER ||--o| PP    : "1:1 subtype (ON DELETE CASCADE)"
+USER ||--o| DP    : "1:1 subtype (ON DELETE CASCADE)"
+USER ||--o{ SESS  : "1:N authenticates (ON DELETE CASCADE)"
+USER ||--o{ AUD   : "1:N generates (ON DELETE SET NULL)"
 
-DP   ||--o{ VEH   : "owns"
-PP   ||--o{ RIDE  : "requests"
-DP   ||--o{ RIDE  : "serves"
-VEH  ||--o{ RIDE  : "used for"
-PR   ||--o{ RIDE  : "computes fare"
+DP   ||--o| VEH   : "1:1 owns/assigned (ON DELETE CASCADE)"
+PP   ||--o{ RIDE  : "1:N requests (RESTRICT)"
+DP   ||--o{ RIDE  : "1:N serves (RESTRICT)"
+VEH  ||--o{ RIDE  : "1:N assigned (RESTRICT)"
+PR   ||--o{ RIDE  : "1:N tariff applied (RESTRICT)"
 
-RIDE ||--|| FARE  : "has one"
-RIDE ||--o| PAY   : "settled by"
-RIDE ||--o{ RAT   : "receives"
+RIDE ||--|| FARE  : "1:1 snapshot (ON DELETE CASCADE)"
+RIDE ||--o{ PAY   : "1:N settled by (ON DELETE CASCADE)"
+RIDE ||--o{ RAT   : "1:N feedback for ride (ON DELETE CASCADE)"
+USER ||--o{ RAT   : "1:N rater (RESTRICT)"
+USER ||--o{ RAT   : "1:N ratee (RESTRICT)"
 
 @enduml
