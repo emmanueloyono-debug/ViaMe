@@ -213,13 +213,13 @@ DELIMITER ;
 -- =====================================================================
 
 -- 1. Insert Base Users (BCrypt hashes for password: 'Password123!')
--- BCrypt sample hash: $2a$12$7kP.WjA8Zg7oK0nE7xKxUeL3K3h7RkX9P6uL0p8nF3qK4eL2mJ5aO
+-- Verified BCrypt hash (cost 12): $2a$12$tBBD95yv.dV7CBE.MUZH5usNco5O9EJ4Wxx4y9FA54J.pf5zLPE1e
 INSERT INTO user (id, email, phone, password_hash, password_salt, role, status) VALUES
-(1, 'admin@viame.cm', '+237670000001', '$2a$12$e8Y6lO7yM9R2K8X8kM3sve6tM1U1jL8qF2oK7eL2mJ5aO8nF3qK4e', 'salt_adm_01', 'ADMIN', 'ACTIVE'),
-(2, 'driver.samuel@viame.cm', '+237670000002', '$2a$12$e8Y6lO7yM9R2K8X8kM3sve6tM1U1jL8qF2oK7eL2mJ5aO8nF3qK4e', 'salt_drv_02', 'DRIVER', 'ACTIVE'),
-(3, 'driver.eric@viame.cm', '+237670000003', '$2a$12$e8Y6lO7yM9R2K8X8kM3sve6tM1U1jL8qF2oK7eL2mJ5aO8nF3qK4e', 'salt_drv_03', 'DRIVER', 'ACTIVE'),
-(4, 'passenger.alice@viame.cm', '+237670000004', '$2a$12$e8Y6lO7yM9R2K8X8kM3sve6tM1U1jL8qF2oK7eL2mJ5aO8nF3qK4e', 'salt_pas_04', 'PASSENGER', 'ACTIVE'),
-(5, 'passenger.bob@viame.cm', '+237670000005', '$2a$12$e8Y6lO7yM9R2K8X8kM3sve6tM1U1jL8qF2oK7eL2mJ5aO8nF3qK4e', 'salt_pas_05', 'PASSENGER', 'ACTIVE');
+(1, 'admin@viame.cm', '+237670000001', '$2a$12$tBBD95yv.dV7CBE.MUZH5usNco5O9EJ4Wxx4y9FA54J.pf5zLPE1e', '$2a$12$tBBD95yv.dV7CBE.MUZH5u', 'ADMIN', 'ACTIVE'),
+(2, 'driver.samuel@viame.cm', '+237670000002', '$2a$12$tBBD95yv.dV7CBE.MUZH5usNco5O9EJ4Wxx4y9FA54J.pf5zLPE1e', '$2a$12$tBBD95yv.dV7CBE.MUZH5u', 'DRIVER', 'ACTIVE'),
+(3, 'driver.eric@viame.cm', '+237670000003', '$2a$12$tBBD95yv.dV7CBE.MUZH5usNco5O9EJ4Wxx4y9FA54J.pf5zLPE1e', '$2a$12$tBBD95yv.dV7CBE.MUZH5u', 'DRIVER', 'ACTIVE'),
+(4, 'passenger.alice@viame.cm', '+237670000004', '$2a$12$tBBD95yv.dV7CBE.MUZH5usNco5O9EJ4Wxx4y9FA54J.pf5zLPE1e', '$2a$12$tBBD95yv.dV7CBE.MUZH5u', 'PASSENGER', 'ACTIVE'),
+(5, 'passenger.bob@viame.cm', '+237670000005', '$2a$12$tBBD95yv.dV7CBE.MUZH5usNco5O9EJ4Wxx4y9FA54J.pf5zLPE1e', '$2a$12$tBBD95yv.dV7CBE.MUZH5u', 'PASSENGER', 'ACTIVE');
 
 -- 2. Insert Passenger Profiles
 INSERT INTO passenger_profile (user_id, full_name, default_payment_method, wallet_balance) VALUES

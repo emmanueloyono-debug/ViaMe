@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="720.0" prefWidth="1060.0" styleClass="auth-root"
+            xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.viame.controller.RegisterController">
+
+    <!-- Left Branding Sidebar -->
+    <left>
+        <VBox alignment="CENTER_LEFT" prefWidth="360.0" spacing="16.0" styleClass="brand-sidebar">
+            <Label styleClass="brand-badge" text="ONBOARDING &amp; REGISTRATION" />
+            <Label styleClass="brand-title" text="Join ViaMe" wrapText="true" />
+            <Label styleClass="brand-subtitle"
+                   text="Create a Passenger account to book instant urban rides, or apply as a Driver with your vehicle details (AD-2 Onboarding Workflow)."
+                   wrapText="true" />
+        </VBox>
+    </left>
+
+    <!-- Center Registration Card -->
+    <center>
+        <StackPane>
+            <padding>
+                <Insets bottom="28.0" left="48.0" right="48.0" top="28.0" />
+            </padding>
+
+            <ScrollPane fitToWidth="true" maxWidth="580.0"
+                        style="-fx-background-color: transparent; -fx-background: transparent;">
+                <content>
+                    <VBox spacing="14.0" styleClass="auth-card">
+                        <VBox spacing="4.0">
+                            <Label styleClass="heading-xl" text="Create Your ViaMe Account" />
+                            <Label styleClass="text-muted" text="All fields are validated before persistence." />
+                        </VBox>
+
+                        <Label fx:id="feedbackLabel" managed="false" maxWidth="1.7976931348623157E308"
+                               styleClass="error-label" visible="false" wrapText="true" />
+
+                        <VBox spacing="6.0">
+                            <Label styleClass="field-label" text="Account Role" />
+                            <ComboBox fx:id="roleComboBox" maxWidth="1.7976931348623157E308" />
+                        </VBox>
+
+                        <GridPane hgap="12.0" vgap="12.0">
+                            <columnConstraints>
+                                <ColumnConstraints hgrow="SOMETIMES" minWidth="100.0" percentWidth="50.0" />
+                                <ColumnConstraints hgrow="SOMETIMES" minWidth="100.0" percentWidth="50.0" />
+                            </columnConstraints>
+                            <rowConstraints>
+                                <RowConstraints vgrow="SOMETIMES" />
+                                <RowConstraints vgrow="SOMETIMES" />
+                            </rowConstraints>
+
+                            <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                <Label styleClass="field-label" text="Full Name" />
+                                <TextField fx:id="fullNameField" promptText="e.g. Jean-Paul Mbarga" />
+                            </VBox>
+
+                            <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                <Label styleClass="field-label" text="Phone Number (Cameroon)" />
+                                <TextField fx:id="phoneField" promptText="e.g. +237670123456" />
+                            </VBox>
+
+                            <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                <Label styleClass="field-label" text="Password (min 8 chars, letter + digit)" />
+                                <PasswordField fx:id="passwordField" promptText="Create password" />
+                            </VBox>
+
+                            <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                <Label styleClass="field-label" text="Confirm Password" />
+                                <PasswordField fx:id="confirmPasswordField" promptText="Repeat password" />
+                            </VBox>
+                        </GridPane>
+
+                        <VBox spacing="6.0">
+                            <Label styleClass="field-label" text="Email Address" />
+                            <TextField fx:id="emailField" promptText="e.g. jean.mbarga@viame.cm" />
+                        </VBox>
+
+                        <!-- Passenger Specific Section -->
+                        <VBox fx:id="passengerSection" spacing="6.0">
+                            <Label styleClass="field-label" text="Preferred Payment Method" />
+                            <ComboBox fx:id="paymentMethodComboBox" maxWidth="1.7976931348623157E308" />
+                        </VBox>
+
+                        <!-- Driver & Vehicle Onboarding Section (AD-2) -->
+                        <VBox fx:id="driverSection" managed="false" spacing="12.0" visible="false">
+                            <Separator />
+                            <Label styleClass="heading-md" text="Driver &amp; Vehicle Onboarding Details (AD-2)" />
+
+                            <GridPane hgap="12.0" vgap="12.0">
+                                <columnConstraints>
+                                    <ColumnConstraints hgrow="SOMETIMES" minWidth="100.0" percentWidth="50.0" />
+                                    <ColumnConstraints hgrow="SOMETIMES" minWidth="100.0" percentWidth="50.0" />
+                                </columnConstraints>
+                                <rowConstraints>
+                                    <RowConstraints vgrow="SOMETIMES" />
+                                    <RowConstraints vgrow="SOMETIMES" />
+                                </rowConstraints>
+
+                                <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                    <Label styleClass="field-label" text="Driver Licence Number" />
+                                    <TextField fx:id="licenceNumberField" promptText="e.g. CMR-LT-2026-1024" />
+                                </VBox>
+
+                                <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                    <Label styleClass="field-label" text="Vehicle Plate Number" />
+                                    <TextField fx:id="plateNumberField" promptText="e.g. LT 784 AB" />
+                                </VBox>
+
+                                <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                    <Label styleClass="field-label" text="Vehicle Make" />
+                                    <TextField fx:id="makeField" promptText="e.g. Toyota" />
+                                </VBox>
+
+                                <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                    <Label styleClass="field-label" text="Vehicle Model" />
+                                    <TextField fx:id="modelField" promptText="e.g. Corolla" />
+                                </VBox>
+                            </GridPane>
+
+                            <VBox spacing="6.0">
+                                <Label styleClass="field-label" text="Passenger Seats Capacity" />
+                                <Spinner fx:id="seatsSpinner" editable="true" maxWidth="180.0" />
+                            </VBox>
+                        </VBox>
+
+                        <Button defaultButton="true" maxWidth="1.7976931348623157E308"
+                                onAction="#handleRegister" styleClass="btn-primary" text="Register Account" />
+
+                        <HBox alignment="CENTER" spacing="6.0">
+                            <Label styleClass="text-muted" text="Already registered?" />
+                            <Hyperlink onAction="#handleBackToLogin" text="Back to Sign In" />
+                        </HBox>
+                    </VBox>
+                </content>
+            </ScrollPane>
+        </StackPane>
+    </center>
+</BorderPane>
+

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="760.0" prefWidth="1180.0"
+            xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.viame.controller.DriverController">
+
+    <!-- Top Navigation Header -->
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="top-bar">
+            <VBox spacing="2.0">
+                <Label styleClass="top-bar-title" text="ViaMe — Driver Portal" />
+                <Label fx:id="driverHeaderLabel" styleClass="top-bar-subtitle" text="Authenticated Driver" />
+            </VBox>
+            <Region HBox.hgrow="ALWAYS" />
+            <Label fx:id="availabilityBadge" styleClass="status-badge, status-online" text="ONLINE" />
+            <Button onAction="#handleLogout" styleClass="btn-danger" text="Sign Out" />
+        </HBox>
+    </top>
+
+    <!-- Main Driver Workspace -->
+    <center>
+        <VBox spacing="20.0">
+            <padding>
+                <Insets bottom="24.0" left="24.0" right="24.0" top="24.0" />
+            </padding>
+
+            <HBox spacing="16.0">
+                <VBox prefWidth="260.0" spacing="4.0" styleClass="metric-card">
+                    <Label styleClass="metric-label" text="ACCUMULATED EARNINGS (80% NET)" />
+                    <Label fx:id="earningsLabel" styleClass="metric-value" text="0.00 XAF" />
+                </VBox>
+                <VBox prefWidth="220.0" spacing="4.0" styleClass="metric-card">
+                    <Label styleClass="metric-label" text="DRIVER REPUTATION RATING" />
+                    <Label fx:id="ratingLabel" styleClass="metric-value" text="5.00 ★" />
+                </VBox>
+            </HBox>
+
+            <VBox spacing="10.0" styleClass="card" VBox.vgrow="ALWAYS">
+                <Label styleClass="heading-lg" text="Driver Dispatch Radar Ready" />
+                <Label styleClass="text-muted"
+                       text="Authenticated driver session active. Duty status toggle, incoming ride broadcast radar, pessimistic lock trip acceptance, and ride state controls will be bound in Sprint 3."
+                       wrapText="true" />
+            </VBox>
+        </VBox>
+    </center>
+</BorderPane>
+

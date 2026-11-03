@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="800.0" prefWidth="1240.0"
+            xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.viame.controller.AdminReportController">
+
+    <!-- Top Navigation Header -->
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="top-bar">
+            <VBox spacing="2.0">
+                <Label styleClass="top-bar-title" text="ViaMe — Dispatcher &amp; Executive Admin Console" />
+                <Label fx:id="adminHeaderLabel" styleClass="top-bar-subtitle" text="Administrator" />
+            </VBox>
+            <Region HBox.hgrow="ALWAYS" />
+            <Button onAction="#handleOpenPassengerWindow" styleClass="btn-secondary" text="+ Passenger Window" />
+            <Button onAction="#handleOpenDriverWindow" styleClass="btn-accent" text="+ Driver Window" />
+            <Button onAction="#handleLogout" styleClass="btn-danger" text="Sign Out" />
+        </HBox>
+    </top>
+
+    <!-- Main Admin Workspace -->
+    <center>
+        <VBox spacing="20.0">
+            <padding>
+                <Insets bottom="24.0" left="24.0" right="24.0" top="24.0" />
+            </padding>
+
+            <VBox spacing="10.0" styleClass="card" VBox.vgrow="ALWAYS">
+                <Label styleClass="heading-lg" text="Dispatcher &amp; Business Intelligence Console Ready" />
+                <Label styleClass="text-muted"
+                       text="Authenticated administrator session active. Live fleet monitoring, driver document verification, dynamic surge tariff configuration, and the 5 analytical BI charts will be bound in Sprint 4."
+                       wrapText="true" />
+            </VBox>
+        </VBox>
+    </center>
+</BorderPane>
+
