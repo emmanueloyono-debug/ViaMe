@@ -17,8 +17,8 @@
 | Role & Focus | Assigned Student | Current Status & Core Deliverables | Next Actions To Complete |
 | :--- | :--- | :--- | :--- |
 | **Student 1: System Analyst & Database Engineer** | *Team Member 1* | **100% Completed:** 10 Use Case specifications, Conceptual ERD, 3NF Normalization justification, and runnable `database/schema.sql` with triggers & verified seed data. | • Maintain local MySQL 8.0 database instance.<br>• Defend 3NF Normalization proofs and trigger logic during oral defense. |
-| **Student 2: Software Architect & Backend Core Engineer** | *Student 2 (Lead Engineer)* | **75% Completed (Sprints 1 & 2 Done):**<br>• Full 5-tier architecture & domain models (`User`, `Passenger`, `Driver`, `Trip`, `Fare`, `Payment`, etc.).<br>• Complete DAO Layer: `UserDAO`, `PassengerDAO`, `DriverDAO`, `VehicleDAO`, `TripDAO`, `PaymentDAO`, `PricingRuleDAO`, `FareDAO`, `RatingDAO`, `AuditLogDAO`, and `TransactionManager`.<br>• Full Service Layer: `AuthenticationService` (BCrypt), `TripService` (pessimistic locking & state machine), `FareCalculationService` (dynamic surge strategy), `DriverMatchingService` (Haversine), `PaymentService` (ACID wallet & cash settlement), `RatingService`, `CancellationPolicy`.<br>• Application Shell: `MainApp.java`, `styles.css`, `LoginView.fxml`, `RegisterView.fxml`, and 25 passing unit tests. | • Assist team with backend service integration in JavaFX views.<br>• Code-review BI analytical SQL aggregate queries. |
-| **Student 3: UI/UX & JavaFX Simulation Developer** | *Team Member 3* | **Ready for Sprint 3 (Part 1 of Remaining Work):** FXML layout shells and controller classes created. | **Execute Part 1 (Sprint 3):**<br>• Implement interactive ride booking on `PassengerDashboard.fxml` (location pickers, instant fare quote preview, wallet top-up, trip tracker).<br>• Implement interactive driver radar on `DriverDashboard.fxml` (duty toggle, 30s countdown broadcast alert, ride workflow action buttons). |
+| **Student 2: Software Architect & Backend Core Engineer** | *Student 2 (Lead Engineer)* | **75% Completed (Sprints 1 & 2 Done):**<br>• Full 5-tier architecture & domain models (`User`, `Passenger`, `Driver`, `Trip`, `Fare`, `Payment`, etc.).<br>• Complete DAO Layer: `UserDAO`, `PassengerDAO`, `DriverDAO`, `VehicleDAO`, `TripDAO`, `PaymentDAO`, `PricingRuleDAO`, `FareDAO`, `RatingDAO`, `AuditLogDAO`, and `TransactionManager`.<br>• Full Service Layer: `AuthenticationService` (BCrypt), `TripService` (pessimistic locking & state machine), `FareCalculationService` (dynamic surge strategy), `DriverMatchingService` (Haversine), `PaymentService` (ACID wallet & cash settlement), `RatingService`, `CancellationPolicy`.<br>• **REST API Server (`RestApiServer.java`):** Standard HTTP REST endpoints enabling **Android $\to$ REST API $\to$ Java backend $\to$ MySQL** without direct DB coupling.<br>• Desktop Application Shell: `MainApp.java`, `styles.css`, `LoginView.fxml`, `RegisterView.fxml`, and 26 passing unit tests. | • Assist team with backend service & REST API integration.<br>• Code-review BI analytical SQL aggregate queries. |
+| **Student 3: UI/UX & Mobile / Desktop Application Developer** | *Team Member 3* | **Ready for Sprint 3 (Part 1 of Remaining Work):** Desktop FXML layout shells and controller classes created; REST API endpoints live. | **Execute Part 1 (Sprint 3):**<br>• Build Android app (or Java GUI client) connecting via REST API: Passenger screen (registration, route estimation, booking, wallet, rating) and Driver screen (duty toggle, incoming radar alert, sequential state actions).<br>• Or finalize interactive JavaFX simulation client for Passenger and Driver views consuming backend services. |
 | **Student 4: QA, Security & Deployment Engineer** | *Team Member 4* | **Ready for Sprint 4 & 5 (Parts 2 & 3 of Remaining Work):** BCrypt authentication & base unit test suite established. | **Execute Parts 2 & 3 (Sprints 4 & 5):**<br>• Implement `ReportService` & embed 5 Business Intelligence analytical charts (`BarChart`, `PieChart`, `LineChart`) in `AdminConsole.fxml`.<br>• Implement driver verification (`AD-2`) and pricing rule configurator (`AD-3`).<br>• Execute multi-threaded concurrency test (`TC-CONC-01`) and prepare oral defense presentation deck. |
 
 ---
@@ -71,15 +71,53 @@ flowchart TD
 
 ---
 
-## 💻 Platform Scope: Desktop vs. Mobile Clarification
+## 📱💻 Platform Scope: Mobile (Android) + Desktop (JavaFX) Architecture
 
 > [!IMPORTANT]
-> **ViaMe is strictly an Enterprise Desktop Application (Desktop Simulation Suite).**  
-> It is **not** a mobile app (no Android APK or iOS app).
-> 
-> - **Technology:** Built with **Java 17+ and JavaFX 17+ using Scene Builder FXML**, executing directly on the desktop JVM (Windows, macOS, Linux).
-> - **Simulation Paradigm:** Designed specifically to satisfy the Institut Saint Jean (ISJ) academic requirements by simulating a real-world multi-user transport network on a single workstation.
-> - **Concurrent Multi-Window Simulation:** Users can launch the **Passenger Console**, the **Driver Portal**, and the **Admin Dispatch Console** as separate, concurrent windows side-by-side, witnessing instant state synchronization and transactional locking in real time.
+> **Project 5 Specification: Android Taxi/Transport Booking System**  
+> **Mandatory Rule:** *"The Android app must not connect directly to MySQL. Use Android → REST API → Java backend → MySQL."*
+
+ViaMe fulfills this requirement with a **Distributed Multi-Tier Hybrid Architecture**:
+
+```mermaid
+graph LR
+    subgraph Mobile_Tier ["Mobile Tier (Android App - Student 3)"]
+        M1["Passenger Mobile Screen\n(Booking, Radar, Wallet)"]
+        M2["Driver Mobile Screen\n(Duty Toggle, Accept, Trips)"]
+    end
+
+    subgraph Desktop_Tier ["Desktop Tier (JavaFX - Students 3 & 4)"]
+        D1["Admin / Dispatcher Console\n(Fleet, Tariffs, 5 BI Reports)"]
+        D2["Multi-Role Desktop Simulation\n(Concurrent Side-by-Side Windows)"]
+    end
+
+    subgraph Backend_Tier ["Backend Core Server (Java 17+ - Student 2)"]
+        API["Built-in REST API Server\n(RestApiServer.java - Port 8080)"]
+        SVC["Service Layer\n(Auth, Trip, Fare, Payment, Matching)"]
+        DAO["DAO Layer & TransactionManager\n(ACID & Concurrency Locks)"]
+    end
+
+    subgraph Database_Tier ["Database Tier (MySQL 8.0 - Student 1)"]
+        DB[("MySQL viame_db (InnoDB - 3NF)\nTriggers, Constraints & Indexes")]
+    end
+
+    Mobile_Tier -- "HTTP JSON REST Calls" --> API
+    Desktop_Tier -- "In-Process / HTTP API" --> SVC
+    API --> SVC
+    SVC --> DAO
+    DAO -- "JDBC Connector/J (TCP/IP 3306)" --> DB
+```
+
+1. **Android Mobile Client (Student 3):**
+   - For **Passengers** and **Drivers** on mobile devices.
+   - Communicates exclusively via HTTP REST API (`/api/auth/*`, `/api/fare/*`, `/api/trips/*`, `/api/wallet/*`).
+   - Does **not** have any direct JDBC connection or MySQL drivers, preserving zero-trust security.
+2. **Java REST API & Backend Server (Student 2):**
+   - Central business logic host: BCrypt authentication, fare strategy, dispatch matching, and ACID transactions.
+   - Built-in lightweight [`RestApiServer.java`](src/main/java/com/viame/api/RestApiServer.java) running on port `8080` without external dependency bloat.
+3. **Desktop JavaFX Console (Students 3 & 4):**
+   - For **Administrators & Dispatchers** to monitor the fleet in real time, verify driver documents (`AD-2`), update dynamic surge pricing tariffs (`AD-3`), and generate the **5 Business Intelligence Reports** with visual charts (`BarChart`, `PieChart`, `LineChart`).
+   - Doubles as an in-class **Multi-Role Desktop Simulation** suite where examiners can test the Passenger, Driver, and Admin roles side by side on one PC.
 
 ---
 
