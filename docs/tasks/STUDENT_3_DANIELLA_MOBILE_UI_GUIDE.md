@@ -86,7 +86,7 @@ Use standard Retrofit, OkHttp, or `HttpURLConnection` to consume the 17 REST end
   - Payment method selector (`DIGITAL WALLET` vs `CASH`).
   - Real-time ride tracker displaying status progress:  
     `REQUESTED` $\to$ `ASSIGNED` $\to$ `DRIVER_EN_ROUTE` $\to$ `ARRIVED` $\to$ `IN_PROGRESS` $\to$ `COMPLETED`.
-  - Assigned driver profile card (Driver name, car make & model, license plate, phone number, star rating).
+  - Assigned driver profile card (Driver name, animated Mimo avatar via `avatarUrl` or `/api/avatar?seed=...`, car make & model, license plate, phone number, star rating).
   - Digital wallet balance display & top-up dialog.
   - Post-ride 1-to-5 star rating & feedback dialog.
 - [ ] **Driver Screen:**
@@ -125,7 +125,7 @@ Before opening your Pull Request for Emmanuel to review, verify:
 - [ ] No direct JDBC or MySQL driver dependencies are added to the Android project (`build.gradle`).
 - [ ] The Android app successfully communicates with `RestApiServer` at `http://10.0.2.2:8080` (or local IP) for login, ride estimation, booking, and wallet top-up.
 - [ ] `mvn clean compile` succeeds on the Java project without breaking any existing classes.
-- [ ] All 34 unit tests in `src/test` continue to pass cleanly.
+- [ ] All 43 unit tests in `src/test` continue to pass cleanly.
 - [ ] JavaFX Passenger and Driver dashboard controllers do not contain any hardcoded raw SQL queries (they must delegate strictly to Services).
 
 ---

@@ -46,4 +46,21 @@ public class RestApiServerTest {
         assertEquals(200, response.statusCode());
         assertTrue(response.body().contains("\"status\":\"UP\""));
     }
+
+    @Test
+    @DisplayName("Avatar endpoint returns valid animated SVG with proper headers")
+    public void testAvatarEndpoint() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + TEST_PORT + "/api/avatar?seed=Samuel&mood=cool&size=96"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode());
+        assertTrue(response.headers().firstValue("Content-Type").orElse("").contains("image/svg+xml"));
+        assertTrue(response.body().contains("<svg"));
+        assertTrue(response.body().contains("</svg>"));
+        assertTrue(response.body().contains("@keyframes mimo-blink"));
+    }
 }

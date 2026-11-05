@@ -84,7 +84,7 @@ The backend reporting engine is already fully implemented by Emmanuel in [`Repor
 ### 2. Quality Assurance, Security & Concurrency Verification
 
 - [ ] **Run the Complete Test Suite:**
-  Verify that all 34 existing unit tests pass:
+  Verify that all 43 existing unit tests pass:
   ```powershell
   # Compile main and test classes
   $m2 = "$env:USERPROFILE\.m2\repository"

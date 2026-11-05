@@ -18,7 +18,9 @@ import com.viame.service.FareQuote;
 import com.viame.service.PaymentService;
 import com.viame.service.ReportService;
 import com.viame.service.TripService;
+import com.viame.util.AvatarUtil;
 import com.viame.util.JsonUtil;
+import com.viame.util.MimoAvatarGenerator;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -143,6 +145,9 @@ public class RestApiServer {
         server.createContext("/api/reports/cancellations", new ReportHandler((f, t, p) -> reportService.cancellations(f, t)));
         server.createContext("/api/reports/loyalty", new ReportHandler((f, t, p) -> reportService.customerLoyalty(f, t)));
 
+        // 6. Native Mimo Avatar Generation Endpoint (GET ?seed=...&mood=...&size=...&shape=...)
+        server.createContext("/api/avatar", new AvatarHandler());
+
         server.start();
         System.out.println("ViaMe REST API Server listening on port " + port);
     }
@@ -172,8 +177,11 @@ public class RestApiServer {
                 String password = json.get("password");
 
                 User user = authService.login(email, password);
-                String res = String.format("{\"success\":true,\"userId\":%d,\"email\":\"%s\",\"role\":\"%s\",\"status\":\"%s\"}",
-                        user.getId(), user.getEmail(), user.getRole(), user.getStatus());
+                MimoAvatarGenerator.Mood userMood = (user.getRole() == com.viame.model.enums.UserRole.DRIVER)
+                        ? MimoAvatarGenerator.Mood.COOL : MimoAvatarGenerator.Mood.HAPPY;
+                String avatarUrl = AvatarUtil.getLocalApiUrl(user.getEmail(), userMood);
+                String res = String.format("{\"success\":true,\"userId\":%d,\"email\":\"%s\",\"role\":\"%s\",\"status\":\"%s\",\"avatarUrl\":\"%s\"}",
+                        user.getId(), user.getEmail(), user.getRole(), user.getStatus(), avatarUrl);
                 sendResponse(exchange, 200, res);
             } catch (AuthenticationException e) {
                 sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
@@ -264,8 +272,9 @@ public class RestApiServer {
                 StringBuilder sb = new StringBuilder("{\"count\":").append(candidates.size()).append(",\"drivers\":[");
                 for (int i = 0; i < candidates.size(); i++) {
                     DriverMatchingService.DriverCandidate c = candidates.get(i);
-                    sb.append(String.format("{\"driverId\":%d,\"name\":\"%s\",\"distanceKm\":%.2f,\"rating\":%.2f}",
-                            c.driver().getId(), c.driver().getFullName(), c.distanceKm(), c.driver().getRatingAvg()));
+                    String avatarUrl = AvatarUtil.getLocalApiUrl(c.driver().getFullName(), MimoAvatarGenerator.Mood.COOL);
+                    sb.append(String.format("{\"driverId\":%d,\"name\":\"%s\",\"distanceKm\":%.2f,\"rating\":%.2f,\"avatarUrl\":\"%s\"}",
+                            c.driver().getId(), c.driver().getFullName(), c.distanceKm(), c.driver().getRatingAvg(), avatarUrl));
                     if (i < candidates.size() - 1) sb.append(",");
                 }
                 sb.append("]}");
@@ -398,6 +407,54 @@ public class RestApiServer {
                 sendResponse(exchange, 200, res);
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+            }
+        }
+    }
+
+    private class AvatarHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            try {
+                Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
+                String seed = params.getOrDefault("seed", params.getOrDefault("name", "viame"));
+                int size = 128;
+                if (params.containsKey("size")) {
+                    try {
+                        size = Integer.parseInt(params.get("size"));
+                    } catch (NumberFormatException ignored) {}
+                }
+                String moodStr = params.get("mood");
+                MimoAvatarGenerator.Mood mood = null;
+                if (moodStr != null) {
+                    try {
+                        mood = MimoAvatarGenerator.Mood.valueOf(moodStr.toUpperCase());
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                String shapeStr = params.get("shape");
+                MimoAvatarGenerator.Shape shape = MimoAvatarGenerator.Shape.CIRCLE;
+                if (shapeStr != null) {
+                    try {
+                        shape = MimoAvatarGenerator.Shape.valueOf(shapeStr.toUpperCase());
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                boolean animated = !"false".equalsIgnoreCase(params.get("animated"));
+
+                String svg = MimoAvatarGenerator.generateSvg(seed, size, shape, mood, animated);
+                byte[] bytes = svg.getBytes(StandardCharsets.UTF_8);
+
+                exchange.getResponseHeaders().set("Content-Type", "image/svg+xml; charset=utf-8");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.getResponseHeaders().set("Cache-Control", "public, max-age=86400");
+                exchange.sendResponseHeaders(200, bytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(bytes);
+                }
+            } catch (Exception e) {
+                sendResponse(exchange, 500, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
         }
     }
