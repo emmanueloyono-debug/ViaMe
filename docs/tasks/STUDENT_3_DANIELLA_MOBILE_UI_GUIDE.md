@@ -55,6 +55,10 @@ As **Student 3**, you are responsible for the user-facing interfaces across two 
 ### PART A: Android Mobile Application (`android/` directory)
 
 > [!IMPORTANT]
+> **UPDATED (Nov 2026): PART A is superseded by the hybrid approach** (one Vite + React + Leaflet codebase, shipped as a PWA and as an Android APK via Capacitor).  
+> 👉 Follow **[STUDENT_3_DANIELLA_HYBRID_MOBILE_GUIDE.md](STUDENT_3_DANIELLA_HYBRID_MOBILE_GUIDE.md)** instead. It also corrects several request field names in the table below (`/api/auth/register/driver`, `/api/trips/status`, `/api/trips/cancel`).
+
+> [!IMPORTANT]
 > **Mandatory Exam Rule (Page 1 of Specification):**  
 > *"The Android app must not connect directly to MySQL. Use Android -> REST API -> Java backend -> MySQL."*  
 > Under NO circumstances should MySQL JDBC drivers (`com.mysql.cj.jdbc.Driver`) be imported or used on Android! All data operations must flow through `RestApiServer` (port `8080`).
