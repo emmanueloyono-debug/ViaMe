@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -62,5 +63,63 @@ public class RestApiServerTest {
         assertTrue(response.body().contains("<svg"));
         assertTrue(response.body().contains("</svg>"));
         assertTrue(response.body().contains("@keyframes mimo-blink"));
+    }
+
+    @Test
+    @DisplayName("CORS OPTIONS preflight returns 204 with required headers across endpoints")
+    public void testCorsPreflightOptions() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + TEST_PORT + "/api/trips/request"))
+                .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
+                .header("Origin", "http://localhost:5173")
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "Content-Type")
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(204, response.statusCode());
+        assertEquals("*", response.headers().firstValue("Access-Control-Allow-Origin").orElse(""));
+        assertTrue(response.headers().firstValue("Access-Control-Allow-Methods").orElse("").contains("POST"));
+        assertTrue(response.headers().firstValue("Access-Control-Allow-Headers").orElse("").contains("Content-Type"));
+    }
+
+    @Test
+    @DisplayName("Wallet balance endpoint validates required passengerId query parameter")
+    public void testWalletBalanceParameterValidation() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + TEST_PORT + "/api/wallet/balance"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, response.statusCode());
+        assertTrue(response.body().contains("Missing passengerId query parameter"));
+    }
+
+    @Test
+    @DisplayName("Trip status endpoint validates required tripId or passengerId query parameters")
+    public void testTripStatusParameterValidation() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + TEST_PORT + "/api/trips/status"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, response.statusCode());
+        assertTrue(response.body().contains("Missing tripId or passengerId query parameter"));
+    }
+
+    @Test
+    @DisplayName("JSON parser safely handles string values with commas and colons")
+    public void testJsonParserWithCommasAndColons() {
+        String json = "{\"pickupAddress\":\"Akwa Palace Hotel, Douala\",\"phone\":\"+237 670:000\",\"passengerId\":1,\"amount\":5000.00}";
+        Map<String, String> map = RestApiServer.parseSimpleJson(json);
+        assertEquals("Akwa Palace Hotel, Douala", map.get("pickupAddress"));
+        assertEquals("+237 670:000", map.get("phone"));
+        assertEquals("1", map.get("passengerId"));
+        assertEquals("5000.00", map.get("amount"));
     }
 }

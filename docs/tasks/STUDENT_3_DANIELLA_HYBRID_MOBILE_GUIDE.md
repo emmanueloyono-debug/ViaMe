@@ -149,10 +149,14 @@ VITE_API_BASE=http://10.0.2.2:8080      # Android emulator → your PC's localho
 # VITE_API_BASE=http://192.168.1.50:8080   # phone on the same Wi-Fi → your PC's LAN IP
 ```
 
-### 5.2 Avoid the CORS preflight with `text/plain` (no backend change needed)
-`RestApiServer` sends `Access-Control-Allow-Origin: *`, but it does **not** answer `OPTIONS` preflight requests. A browser sends a preflight automatically for `POST` with `Content-Type: application/json`, and that request would fail.
+### 5.2 Native CORS & JSON Support (Fully Configured in Backend)
+`RestApiServer` now natively handles HTTP `OPTIONS` preflight requests returning `204 No Content` with:
+- `Access-Control-Allow-Origin: *`
+- `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`
+- `Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With`
 
-**Solution:** send the JSON body with `Content-Type: text/plain`. That makes it a "simple" request (no preflight). The backend reads the raw body, so it doesn't care about the header.
+You can use standard `Content-Type: application/json` directly with `fetch` or `axios`.
+Furthermore, the backend JSON parser is now token-aware and safely handles string values containing commas (e.g. `"Akwa Palace Hotel, Douala"`) and colons without truncation.
 
 ```ts
 // src/api/client.ts
@@ -165,7 +169,7 @@ export class ApiError extends Error {
 export async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, // avoids CORS preflight
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -180,9 +184,6 @@ export async function get<T>(path: string): Promise<T> {
   return data as T;
 }
 ```
-
-> [!WARNING]
-> **The backend's JSON parser is very simple** (`parseSimpleJson`): flat objects only, no nested objects/arrays, and **values must not contain commas or colons**. Example: `"Akwa Palace Hotel, Douala"` would break the request. Use addresses without commas (e.g. `"Akwa Palace Hotel - Douala"`).
 
 ### 5.3 Capacitor / Android cleartext HTTP
 The backend uses plain `http://`. By default Capacitor serves the app from `https://localhost`, and Android blocks HTTPS pages from calling `http://` APIs (mixed content). Use this config:
@@ -212,25 +213,33 @@ export default config;
 
 ## 6. REST Contract (verified against `RestApiServer.java`)
 
-> [!IMPORTANT]
-> Some field names in the older guide's table are wrong. **The names below are the ones the code actually reads.**
+All endpoints are fully implemented and verified in [`RestApiServer.java`](../../src/main/java/com/viame/api/RestApiServer.java):
 
-| Endpoint | Request body / query | Success response |
-| :--- | :--- | :--- |
-| `POST /api/auth/login` | `{email, password}` | `200 {success, userId, email, role, status, avatarUrl}` · `401 {error}` |
-| `POST /api/auth/register/passenger` | `{email, phone, password, fullName, paymentMethod?}` (`WALLET` default) | `201 {success, userId, fullName, walletBalance}` |
-| `POST /api/auth/register/driver` | `{email, phone, password, fullName, licenceNumber, plateNumber, make, model, seats?}` | `201 {success, userId, verificationStatus}` |
-| `POST /api/fare/estimate` | `{pickupLat, pickupLng, dropoffLat, dropoffLng}` | `200 {distanceKm, durationMin, baseFare, surge, totalAmount, currency}` |
-| `GET /api/drivers/available` | `?lat=&lng=&radius=` | `200 {count, drivers:[{driverId, name, distanceKm, rating, avatarUrl}]}` |
-| `POST /api/trips/request` | `{passengerId, pickupLat, pickupLng, pickupAddress, dropoffLat, dropoffLng, dropoffAddress, paymentMethod}` | `201 {success, tripId, status, distanceKm, durationMin}` · `402` insufficient funds |
-| `POST /api/trips/accept` | `{tripId, driverId}` | `200 {success, tripId, status, driverId}` · `400` if already taken |
-| `POST /api/trips/status` | `{tripId, driverId, action, paymentMethod?}` — `action` ∈ `EN_ROUTE`, `ARRIVED`, `START`, `COMPLETE` | `200 {success, tripId, status}` |
-| `POST /api/trips/cancel` | `{tripId, userId, isPassenger}` | `200 {success, tripId, status}` |
-| `POST /api/wallet/topup` | `{passengerId, amount, provider?}` | `200 {success, passengerId, newBalance}` |
-| `GET /api/avatar` | `?seed=&mood=&size=&shape=&animated=` | SVG image (use directly in `<img src>`) |
-| `GET /api/health` | — | `200 {status:"UP"}` |
+| Category | Endpoint | Method | Request body / query | Success response |
+| :--- | :--- | :---: | :--- | :--- |
+| **Auth** | `/api/auth/login` | `POST` | `{email, password}` | `200 {success, userId, email, role, status, avatarUrl}` · `401 {error}` |
+| **Auth** | `/api/auth/register/passenger` | `POST` | `{email, phone, password, fullName, paymentMethod?}` (`WALLET` default) | `201 {success, userId, fullName, walletBalance}` |
+| **Auth** | `/api/auth/register/driver` | `POST` | `{email, phone, password, fullName, licenceNumber, plateNumber, make, model, seats?}` | `201 {success, userId, verificationStatus}` |
+| **Fare** | `/api/fare/estimate` | `POST` | `{pickupLat, pickupLng, dropoffLat, dropoffLng}` | `200 {distanceKm, durationMin, baseFare, surge, totalAmount, currency}` |
+| **Dispatch** | `/api/drivers/available` | `GET` | `?lat=&lng=&radius=` | `200 {count, drivers:[{driverId, name, distanceKm, rating, avatarUrl}]}` |
+| **Driver Duty** | `/api/drivers/availability` | `POST` | `{driverId, status}` (`ONLINE` / `OFFLINE`) | `200 {success, driverId, status}` |
+| **Driver Duty** | `/api/drivers/availability` | `GET` | `?driverId=` | `200 {success, driverId, status}` |
+| **Driver Earnings**| `/api/drivers/earnings` | `GET` | `?driverId=` | `200 {success, driverId, netEarnings, commission, grossRevenue, completedTrips, ratingAvg, availability}` |
+| **Trips** | `/api/trips/request` | `POST` | `{passengerId, pickupLat, pickupLng, pickupAddress, dropoffLat, dropoffLng, dropoffAddress, paymentMethod}` | `201 {success, tripId, status, distanceKm, durationMin}` · `402` insufficient funds |
+| **Trips** | `/api/trips/accept` | `POST` | `{tripId, driverId}` | `200 {success, tripId, status, driverId}` · `400` if already taken |
+| **Trips** | `/api/trips/status` | `GET` | `?tripId=` OR `?passengerId=` | `200 {success, tripId, passengerId, driverId, status, pickupAddress, dropoffAddress, distanceKm, ...}` |
+| **Trips** | `/api/trips/status` | `POST` | `{tripId, driverId, action, paymentMethod?}` — `action` ∈ `EN_ROUTE`, `ARRIVED`, `START`, `COMPLETE` | `200 {success, tripId, status, ...}` |
+| **Trips** | `/api/trips/pending` | `GET` | — | `200 {count, trips:[{tripId, passengerId, pickupAddress, dropoffAddress, ...}]}` (Driver Radar) |
+| **Trips** | `/api/trips/cancel` | `POST` | `{tripId, userId, isPassenger}` | `200 {success, tripId, status}` |
+| **Wallet** | `/api/wallet/balance` | `GET` | `?passengerId=` | `200 {success, passengerId, balance}` |
+| **Wallet** | `/api/wallet/topup` | `POST` | `{passengerId, amount, provider?}` | `200 {success, passengerId, newBalance}` |
+| **Ratings** | `/api/ratings` | `POST` | `{tripId, raterId, rateeId, score, comment?}` | `201 {success, ratingId, score}` |
+| **Ratings** | `/api/ratings` | `GET` | `?userId=` | `200 {userId, count, ratings:[...]}` |
+| **Avatar** | `/api/avatar` | `GET` | `?seed=&mood=&size=&shape=&animated=` | SVG image (use directly in `<img src>`) |
+| **Health** | `/api/health` | `GET` | — | `200 {status:"UP"}` |
 
-All errors come back as `{"error": "..."}`.
+All errors return standard HTTP status codes with `{"error": "..."}`.
+All endpoints support CORS `OPTIONS` preflight requests (`204 No Content`).
 
 ---
 
@@ -285,24 +294,20 @@ export function MapView({ pickup, dropoff, onPick }: {
 
 ---
 
-## 8. Known Backend Gaps (coordinate with Emmanuel — do NOT edit the backend yourself)
+## 8. Backend Status: All Endpoints Live (Zero Mocks Needed!)
 
-The current API covers booking, accepting, status changes, cancellation and top-up. Some mobile features have **no endpoint yet**. The service methods already exist, so Emmanuel only needs to add thin REST handlers. No business logic or database changes are required.
-
-| # | Missing endpoint (proposed) | Needed for | Existing backend method |
-| :-: | :--- | :--- | :--- |
-| G1 | `GET /api/trips/{id}` or `GET /api/trips/get?tripId=` | Passenger live status stepper (polling every 3 s) | `TripService.getTripById` |
-| G2 | `GET /api/trips/pending` | Driver radar: discover new requests (polling every 3 s) | `TripService.getPendingBroadcastRequests` |
-| G3 | `POST /api/drivers/availability` `{driverId, status}` | ONLINE/OFFLINE toggle | `DriverDAO.updateAvailability` |
-| G4 | `GET /api/wallet/balance?passengerId=` | Show balance on load | `PassengerDAO` |
-| G5 | `POST /api/ratings` `{tripId, raterId, rateeId, score, comment}` | Post-ride rating | `RatingService.submitRating` |
-| G6 | `GET /api/drivers/earnings?driverId=` | Earnings card | `TripService.getTripsForDriver` / payments |
-| G7 | Handle `OPTIONS` (CORS preflight) | Optional: lets you drop the `text/plain` trick | — |
-
-**Until those endpoints exist:**
-- Build the UI behind an interface in `endpoints.ts` (e.g. `getTrip(id)`), and use a clearly labelled **mock** implementation (`VITE_USE_MOCKS=true`) for G1–G6.
-- Passenger status: after `POST /api/trips/request`, you can show progress based on the driver's actions only if both roles are in the same demo device. Otherwise use the mock.
-- Never fake data silently in the final demo: either the endpoint exists or the screen says "demo mode".
+> [!IMPORTANT]
+> **COMPLETED & DEPLOYED (Nov 2026):**  
+> All 7 previously identified gaps (G1 through G7) have been implemented, tested, and pushed directly to `RestApiServer.java` on `main`:
+> 1. ✅ **`GET /api/trips/status?tripId=...` & `GET /api/trips/status?passengerId=...`**: Live passenger status polling.
+> 2. ✅ **`GET /api/trips/pending`**: Live driver radar pending requests polling.
+> 3. ✅ **`POST /api/drivers/availability`**: Driver duty switch (`ONLINE` / `OFFLINE`).
+> 4. ✅ **`GET /api/wallet/balance?passengerId=...`**: Instant passenger wallet balance lookup.
+> 5. ✅ **`POST /api/ratings`**: 1-to-5 star evaluation submission for completed trips.
+> 6. ✅ **`GET /api/drivers/earnings?driverId=...`**: Driver earnings card (gross, 20% commission, net payout, trips count, rating).
+> 7. ✅ **Native CORS `OPTIONS` Preflight & Comma-Safe JSON**: Standard `application/json` is supported on all endpoints without workarounds.
+>
+> You can now connect all mobile screens directly to the real backend with **zero mocked data**.
 
 ---
 
