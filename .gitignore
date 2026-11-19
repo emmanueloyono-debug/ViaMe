@@ -36,3 +36,15 @@ Thumbs.db
 .DS_Store
 *.log
 
+### Agent & Mobile Build Artifacts ###
+.agents/
+.gemini/
+mobile/node_modules/
+mobile/dist/
+mobile/.env
+mobile/.env.local
+mobile/android/.gradle/
+mobile/android/app/build/
+*.apk
+
+

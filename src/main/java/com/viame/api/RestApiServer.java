@@ -5,19 +5,26 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.viame.dao.DriverDAO;
 import com.viame.dao.PassengerDAO;
+import com.viame.dao.SessionDAO;
+import com.viame.dao.UserDAO;
 import com.viame.dao.impl.DriverDAOImpl;
 import com.viame.dao.impl.PassengerDAOImpl;
+import com.viame.dao.impl.SessionDAOImpl;
+import com.viame.dao.impl.UserDAOImpl;
 import com.viame.exception.AuthenticationException;
 import com.viame.exception.InsufficientFundsException;
 import com.viame.exception.ValidationException;
 import com.viame.model.Driver;
 import com.viame.model.Passenger;
 import com.viame.model.Rating;
+import com.viame.model.Session;
 import com.viame.model.Trip;
 import com.viame.model.User;
 import com.viame.model.enums.DriverAvailability;
 import com.viame.model.enums.PaymentMethod;
 import com.viame.model.enums.TripStatus;
+import com.viame.model.enums.UserRole;
+import com.viame.model.enums.UserStatus;
 import com.viame.service.AuthenticationService;
 import com.viame.service.DriverMatchingService;
 import com.viame.service.FareCalculationService;
@@ -29,6 +36,7 @@ import com.viame.service.TripService;
 import com.viame.util.AvatarUtil;
 import com.viame.util.JsonUtil;
 import com.viame.util.MimoAvatarGenerator;
+import com.viame.util.SessionManager;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,12 +45,18 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -55,6 +69,7 @@ import java.util.concurrent.Executors;
  *
  * Runs on standard JDK com.sun.net.httpserver without external bloat.
  * Fully supports CORS preflight (OPTIONS) for seamless browser and native mobile consumption.
+ * Enforces session token authentication and RBAC authorization with anti-ID spoofing protection.
  */
 public class RestApiServer {
 
@@ -62,15 +77,19 @@ public class RestApiServer {
     private HttpServer server;
     private ExecutorService executor;
 
-    private final AuthenticationService authService = new AuthenticationService();
-    private final TripService tripService = new TripService();
-    private final FareCalculationService fareService = new FareCalculationService();
-    private final PaymentService paymentService = new PaymentService();
-    private final DriverMatchingService driverMatchingService = new DriverMatchingService();
-    private final ReportService reportService = new ReportService();
-    private final RatingService ratingService = new RatingService();
-    private final DriverDAO driverDAO = new DriverDAOImpl();
-    private final PassengerDAO passengerDAO = new PassengerDAOImpl();
+    private final AuthenticationService authService;
+    private final TripService tripService;
+    private final FareCalculationService fareService;
+    private final PaymentService paymentService;
+    private final DriverMatchingService driverMatchingService;
+    private final ReportService reportService;
+    private final RatingService ratingService;
+    private final DriverDAO driverDAO;
+    private final PassengerDAO passengerDAO;
+    private final UserDAO userDAO;
+    private final SessionDAO sessionDAO;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @FunctionalInterface
     private interface ReportQuery {
@@ -79,7 +98,7 @@ public class RestApiServer {
 
     /**
      * Generic GET handler for BI reports. Defaults to the last 30 days when no range is given.
-     * Response: {"from":..,"to":..,"count":n,"rows":[...]}
+     * Protected: requires ADMIN role.
      */
     private class ReportHandler implements HttpHandler {
         private final ReportQuery query;
@@ -96,6 +115,12 @@ public class RestApiServer {
                 return;
             }
             try {
+                User authUser = authenticate(exchange);
+                if (authUser.getRole() != UserRole.ADMIN) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Admin role required to access reports\"}");
+                    return;
+                }
+
                 Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
                 LocalDate to = params.containsKey("to") ? LocalDate.parse(params.get("to")) : LocalDate.now();
                 LocalDate from = params.containsKey("from") ? LocalDate.parse(params.get("from")) : to.minusDays(30);
@@ -106,6 +131,8 @@ public class RestApiServer {
                 body.put("count", rows.size());
                 body.put("rows", rows);
                 sendResponse(exchange, 200, JsonUtil.toJson(body));
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (DateTimeParseException | NumberFormatException e) {
                 sendResponse(exchange, 400, "{\"error\":\"Invalid parameter: " + escapeJson(e.getMessage()) + "\"}");
             } catch (ValidationException e) {
@@ -117,7 +144,29 @@ public class RestApiServer {
     }
 
     public RestApiServer(int port) {
+        this(port, new AuthenticationService(), new TripService(), new FareCalculationService(),
+                new PaymentService(), new DriverMatchingService(), new ReportService(),
+                new RatingService(), new DriverDAOImpl(), new PassengerDAOImpl(),
+                new UserDAOImpl(), new SessionDAOImpl());
+    }
+
+    public RestApiServer(int port, AuthenticationService authService, TripService tripService,
+                         FareCalculationService fareService, PaymentService paymentService,
+                         DriverMatchingService driverMatchingService, ReportService reportService,
+                         RatingService ratingService, DriverDAO driverDAO, PassengerDAO passengerDAO,
+                         UserDAO userDAO, SessionDAO sessionDAO) {
         this.port = port;
+        this.authService = authService;
+        this.tripService = tripService;
+        this.fareService = fareService;
+        this.paymentService = paymentService;
+        this.driverMatchingService = driverMatchingService;
+        this.reportService = reportService;
+        this.ratingService = ratingService;
+        this.driverDAO = driverDAO;
+        this.passengerDAO = passengerDAO;
+        this.userDAO = userDAO;
+        this.sessionDAO = sessionDAO;
     }
 
     public void start() throws IOException {
@@ -137,6 +186,7 @@ public class RestApiServer {
 
         // 1. Authentication Endpoints
         server.createContext("/api/auth/login", new LoginHandler());
+        server.createContext("/api/auth/logout", new LogoutHandler());
         server.createContext("/api/auth/register/passenger", new RegisterPassengerHandler());
         server.createContext("/api/auth/register/driver", new RegisterDriverHandler());
 
@@ -203,14 +253,63 @@ public class RestApiServer {
                 String password = json.get("password");
 
                 User user = authService.login(email, password);
-                MimoAvatarGenerator.Mood userMood = (user.getRole() == com.viame.model.enums.UserRole.DRIVER)
+
+                // Issue REST session token and store in database session table
+                String rawToken = generateToken();
+                String tokenHash = hashToken(rawToken);
+                Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS);
+
+                String clientIp = null;
+                if (exchange.getRequestHeaders().containsKey("X-Forwarded-For")) {
+                    clientIp = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
+                } else if (exchange.getRemoteAddress() != null && exchange.getRemoteAddress().getAddress() != null) {
+                    clientIp = exchange.getRemoteAddress().getAddress().getHostAddress();
+                }
+                if (clientIp != null && clientIp.length() > 45) {
+                    clientIp = clientIp.substring(0, 45);
+                }
+
+                Session session = new Session(tokenHash, user.getId(), expiresAt, clientIp);
+                sessionDAO.save(session);
+
+                // Bind to SessionManager for per-token session isolation
+                SessionManager.getInstance().login(rawToken, user);
+                SessionManager.getInstance().login(tokenHash, user);
+
+                MimoAvatarGenerator.Mood userMood = (user.getRole() == UserRole.DRIVER)
                         ? MimoAvatarGenerator.Mood.COOL : MimoAvatarGenerator.Mood.HAPPY;
                 String avatarUrl = AvatarUtil.getLocalApiUrl(user.getEmail(), userMood);
-                String res = String.format("{\"success\":true,\"userId\":%d,\"email\":\"%s\",\"role\":\"%s\",\"status\":\"%s\",\"avatarUrl\":\"%s\"}",
-                        user.getId(), user.getEmail(), user.getRole(), user.getStatus(), avatarUrl);
+
+                String res = String.format(Locale.US,
+                        "{\"success\":true,\"token\":\"%s\",\"sessionToken\":\"%s\",\"userId\":%d,\"email\":\"%s\",\"role\":\"%s\",\"status\":\"%s\",\"avatarUrl\":\"%s\",\"expiresAt\":\"%s\"}",
+                        rawToken, rawToken, user.getId(), user.getEmail(), user.getRole(), user.getStatus(), avatarUrl, expiresAt);
                 sendResponse(exchange, 200, res);
             } catch (AuthenticationException e) {
                 sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+            }
+        }
+    }
+
+    private class LogoutHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (handlePreflight(exchange)) return;
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            try {
+                String token = extractBearerToken(exchange);
+                if (token != null && !token.isBlank()) {
+                    String tokenHash = hashToken(token);
+                    sessionDAO.deleteByTokenHash(tokenHash);
+                    sessionDAO.deleteByTokenHash(token);
+                    SessionManager.getInstance().logout(token);
+                    SessionManager.getInstance().logout(tokenHash);
+                }
+                sendResponse(exchange, 200, "{\"success\":true,\"message\":\"Logged out successfully\"}");
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
@@ -230,7 +329,7 @@ public class RestApiServer {
                 Passenger p = authService.registerPassenger(
                         json.get("email"), json.get("phone"), json.get("password"),
                         json.get("fullName"), PaymentMethod.valueOf(json.getOrDefault("paymentMethod", "WALLET")));
-                String res = String.format("{\"success\":true,\"userId\":%d,\"fullName\":\"%s\",\"walletBalance\":%.2f}",
+                String res = String.format(Locale.US, "{\"success\":true,\"userId\":%d,\"fullName\":\"%s\",\"walletBalance\":%.2f}",
                         p.getId(), p.getFullName(), p.getWalletBalance());
                 sendResponse(exchange, 201, res);
             } catch (Exception e) {
@@ -254,7 +353,7 @@ public class RestApiServer {
                         json.get("email"), json.get("phone"), json.get("password"),
                         json.get("fullName"), json.get("licenceNumber"), json.get("plateNumber"),
                         json.get("make"), json.get("model"), seats);
-                String res = String.format("{\"success\":true,\"userId\":%d,\"verificationStatus\":\"%s\"}",
+                String res = String.format(Locale.US, "{\"success\":true,\"userId\":%d,\"verificationStatus\":\"%s\"}",
                         d.getId(), d.getVerificationStatus());
                 sendResponse(exchange, 201, res);
             } catch (Exception e) {
@@ -279,7 +378,8 @@ public class RestApiServer {
                 double dLng = Double.parseDouble(json.get("dropoffLng"));
 
                 FareQuote quote = fareService.estimate(pLat, pLng, dLat, dLng);
-                String res = String.format("{\"distanceKm\":%.2f,\"durationMin\":%d,\"baseFare\":%.2f,\"surge\":%.2f,\"totalAmount\":%.2f,\"currency\":\"%s\"}",
+                String res = String.format(Locale.US,
+                        "{\"distanceKm\":%.2f,\"durationMin\":%d,\"baseFare\":%.2f,\"surge\":%.2f,\"totalAmount\":%.2f,\"currency\":\"%s\"}",
                         quote.distanceKm(), quote.durationMin(), quote.baseFare(), quote.surgeMultiplier(), quote.totalAmount(), quote.currency());
                 sendResponse(exchange, 200, res);
             } catch (Exception e) {
@@ -307,7 +407,7 @@ public class RestApiServer {
                 for (int i = 0; i < candidates.size(); i++) {
                     DriverMatchingService.DriverCandidate c = candidates.get(i);
                     String avatarUrl = AvatarUtil.getLocalApiUrl(c.driver().getFullName(), MimoAvatarGenerator.Mood.COOL);
-                    sb.append(String.format("{\"driverId\":%d,\"name\":\"%s\",\"distanceKm\":%.2f,\"rating\":%.2f,\"avatarUrl\":\"%s\"}",
+                    sb.append(String.format(Locale.US, "{\"driverId\":%d,\"name\":\"%s\",\"distanceKm\":%.2f,\"rating\":%.2f,\"avatarUrl\":\"%s\"}",
                             c.driver().getId(), c.driver().getFullName(), c.distanceKm(), c.driver().getRatingAvg(), avatarUrl));
                     if (i < candidates.size() - 1) sb.append(",");
                 }
@@ -328,8 +428,21 @@ public class RestApiServer {
                 return;
             }
             try {
+                User authUser = authenticate(exchange);
+                if (authUser.getRole() != UserRole.PASSENGER && authUser.getRole() != UserRole.ADMIN) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Only passengers can request trips\"}");
+                    return;
+                }
+
                 Map<String, String> json = parseSimpleJson(readBody(exchange));
                 long passengerId = Long.parseLong(json.get("passengerId"));
+
+                // Anti-spoofing: passenger can only request trips for their own account
+                if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != passengerId) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot request trip for another passenger (ID spoofing detected)\"}");
+                    return;
+                }
+
                 double pLat = Double.parseDouble(json.get("pickupLat"));
                 double pLng = Double.parseDouble(json.get("pickupLng"));
                 String pAddr = json.get("pickupAddress");
@@ -339,9 +452,11 @@ public class RestApiServer {
                 PaymentMethod method = PaymentMethod.valueOf(json.getOrDefault("paymentMethod", "WALLET"));
 
                 Trip trip = tripService.requestTrip(passengerId, pLat, pLng, pAddr, dLat, dLng, dAddr, method);
-                String res = String.format("{\"success\":true,\"tripId\":%d,\"status\":\"%s\",\"distanceKm\":%.2f,\"durationMin\":%d}",
+                String res = String.format(Locale.US, "{\"success\":true,\"tripId\":%d,\"status\":\"%s\",\"distanceKm\":%.2f,\"durationMin\":%d}",
                         trip.getId(), trip.getStatus(), trip.getDistanceKm(), trip.getDurationMin());
                 sendResponse(exchange, 201, res);
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (InsufficientFundsException e) {
                 sendResponse(exchange, 402, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
@@ -359,14 +474,28 @@ public class RestApiServer {
                 return;
             }
             try {
+                User authUser = authenticate(exchange);
+                if (authUser.getRole() != UserRole.DRIVER && authUser.getRole() != UserRole.ADMIN) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Only drivers can accept trips\"}");
+                    return;
+                }
+
                 Map<String, String> json = parseSimpleJson(readBody(exchange));
                 long tripId = Long.parseLong(json.get("tripId"));
                 long driverId = Long.parseLong(json.get("driverId"));
 
+                // Anti-spoofing: driver can only accept trips for themselves
+                if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != driverId) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot accept trip for another driver (ID spoofing detected)\"}");
+                    return;
+                }
+
                 Trip trip = tripService.acceptTrip(tripId, driverId);
-                String res = String.format("{\"success\":true,\"tripId\":%d,\"status\":\"%s\",\"driverId\":%d}",
+                String res = String.format(Locale.US, "{\"success\":true,\"tripId\":%d,\"status\":\"%s\",\"driverId\":%d}",
                         trip.getId(), trip.getStatus(), trip.getDriverId());
                 sendResponse(exchange, 200, res);
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
@@ -384,14 +513,34 @@ public class RestApiServer {
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 try {
                     Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
-                    Optional<Trip> optTrip;
-                    if (params.containsKey("tripId")) {
-                        optTrip = tripService.getTripById(Long.parseLong(params.get("tripId")));
-                    } else if (params.containsKey("passengerId")) {
-                        optTrip = tripService.getActiveTripForPassenger(Long.parseLong(params.get("passengerId")));
-                    } else {
+                    if (!params.containsKey("tripId") && !params.containsKey("passengerId")) {
                         sendResponse(exchange, 400, "{\"error\":\"Missing tripId or passengerId query parameter\"}");
                         return;
+                    }
+
+                    User authUser = authenticate(exchange);
+
+                    Optional<Trip> optTrip;
+                    if (params.containsKey("tripId")) {
+                        long tripId = Long.parseLong(params.get("tripId"));
+                        optTrip = tripService.getTripById(tripId);
+                        if (optTrip.isPresent()) {
+                            Trip trip = optTrip.get();
+                            // Anti-spoofing: user must be admin, or the passenger/driver of the trip
+                            boolean isParty = authUser.getId() == trip.getPassengerId() ||
+                                    (trip.getDriverId() != null && authUser.getId() == trip.getDriverId());
+                            if (authUser.getRole() != UserRole.ADMIN && !isParty) {
+                                sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot view trip details for other users\"}");
+                                return;
+                            }
+                        }
+                    } else {
+                        long passengerId = Long.parseLong(params.get("passengerId"));
+                        if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != passengerId) {
+                            sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot view active trips for other passengers\"}");
+                            return;
+                        }
+                        optTrip = tripService.getActiveTripForPassenger(passengerId);
                     }
 
                     if (optTrip.isEmpty()) {
@@ -399,6 +548,8 @@ public class RestApiServer {
                         return;
                     }
                     sendResponse(exchange, 200, formatTripJson(optTrip.get()));
+                } catch (AuthenticationException e) {
+                    sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 } catch (Exception e) {
                     sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 }
@@ -407,10 +558,27 @@ public class RestApiServer {
 
             if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 try {
+                    User authUser = authenticate(exchange);
+                    if (authUser.getRole() != UserRole.DRIVER && authUser.getRole() != UserRole.ADMIN) {
+                        sendResponse(exchange, 403, "{\"error\":\"Forbidden: Only drivers can advance trip status\"}");
+                        return;
+                    }
+
                     Map<String, String> json = parseSimpleJson(readBody(exchange));
                     long tripId = Long.parseLong(json.get("tripId"));
                     long driverId = Long.parseLong(json.get("driverId"));
+
+                    // Anti-spoofing: driver can only update trip for themselves
+                    if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != driverId) {
+                        sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot advance trip status for another driver\"}");
+                        return;
+                    }
+
                     String action = json.get("action"); // EN_ROUTE, ARRIVED, START, COMPLETE
+                    if (action == null || action.isBlank()) {
+                        sendResponse(exchange, 400, "{\"error\":\"Missing action parameter\"}");
+                        return;
+                    }
 
                     Trip trip = switch (action.toUpperCase()) {
                         case "EN_ROUTE" -> tripService.driverEnRoute(tripId, driverId);
@@ -422,6 +590,8 @@ public class RestApiServer {
                     };
 
                     sendResponse(exchange, 200, formatTripJson(trip));
+                } catch (AuthenticationException e) {
+                    sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 } catch (Exception e) {
                     sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 }
@@ -441,6 +611,12 @@ public class RestApiServer {
                 return;
             }
             try {
+                User authUser = authenticate(exchange);
+                if (authUser.getRole() != UserRole.DRIVER && authUser.getRole() != UserRole.ADMIN) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Only drivers can view pending trip requests\"}");
+                    return;
+                }
+
                 List<Trip> pending = tripService.getPendingBroadcastRequests();
                 Map<String, Object> body = new LinkedHashMap<>();
                 body.put("count", pending.size());
@@ -450,6 +626,8 @@ public class RestApiServer {
                 }
                 body.put("trips", tripList);
                 sendResponse(exchange, 200, JsonUtil.toJson(body));
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
@@ -465,13 +643,22 @@ public class RestApiServer {
                 return;
             }
             try {
+                User authUser = authenticate(exchange);
                 Map<String, String> json = parseSimpleJson(readBody(exchange));
                 long tripId = Long.parseLong(json.get("tripId"));
                 long userId = Long.parseLong(json.get("userId"));
                 boolean isPassenger = Boolean.parseBoolean(json.getOrDefault("isPassenger", "true"));
 
+                // Anti-spoofing: cannot cancel on behalf of another user
+                if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != userId) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot cancel trip for another user\"}");
+                    return;
+                }
+
                 Trip trip = tripService.cancelTrip(tripId, userId, isPassenger);
                 sendResponse(exchange, 200, formatTripJson(trip));
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
@@ -487,14 +674,24 @@ public class RestApiServer {
                 return;
             }
             try {
+                User authUser = authenticate(exchange);
                 Map<String, String> json = parseSimpleJson(readBody(exchange));
                 long passengerId = Long.parseLong(json.get("passengerId"));
+
+                // Anti-spoofing check
+                if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != passengerId) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot top up wallet for another passenger\"}");
+                    return;
+                }
+
                 BigDecimal amount = new BigDecimal(json.get("amount"));
                 String provider = json.getOrDefault("provider", "MOBILE_MONEY");
 
                 BigDecimal newBalance = paymentService.topUpWallet(passengerId, amount, provider);
-                String res = String.format("{\"success\":true,\"passengerId\":%d,\"newBalance\":%.2f}", passengerId, newBalance);
+                String res = String.format(Locale.US, "{\"success\":true,\"passengerId\":%d,\"newBalance\":%.2f}", passengerId, newBalance);
                 sendResponse(exchange, 200, res);
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
@@ -516,13 +713,22 @@ public class RestApiServer {
                     return;
                 }
                 long passengerId = Long.parseLong(params.get("passengerId"));
+
+                User authUser = authenticate(exchange);
+                if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != passengerId) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot view another passenger's wallet balance\"}");
+                    return;
+                }
+
                 Optional<Passenger> opt = passengerDAO.findById(passengerId);
                 if (opt.isEmpty()) {
                     sendResponse(exchange, 404, "{\"error\":\"Passenger not found\"}");
                     return;
                 }
                 BigDecimal balance = opt.get().getWalletBalance();
-                sendResponse(exchange, 200, String.format("{\"success\":true,\"passengerId\":%d,\"balance\":%.2f}", passengerId, balance));
+                sendResponse(exchange, 200, String.format(Locale.US, "{\"success\":true,\"passengerId\":%d,\"balance\":%.2f}", passengerId, balance));
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
@@ -535,8 +741,16 @@ public class RestApiServer {
             if (handlePreflight(exchange)) return;
             if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 try {
+                    User authUser = authenticate(exchange);
                     Map<String, String> json = parseSimpleJson(readBody(exchange));
                     long driverId = Long.parseLong(json.get("driverId"));
+
+                    // Anti-spoofing
+                    if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != driverId) {
+                        sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot update availability for another driver\"}");
+                        return;
+                    }
+
                     String statusStr = json.get("status");
                     if (statusStr == null || statusStr.isBlank()) {
                         sendResponse(exchange, 400, "{\"error\":\"Missing status parameter\"}");
@@ -548,7 +762,9 @@ public class RestApiServer {
                         sendResponse(exchange, 404, "{\"error\":\"Driver not found\"}");
                         return;
                     }
-                    sendResponse(exchange, 200, String.format("{\"success\":true,\"driverId\":%d,\"status\":\"%s\"}", driverId, availability));
+                    sendResponse(exchange, 200, String.format(Locale.US, "{\"success\":true,\"driverId\":%d,\"status\":\"%s\"}", driverId, availability));
+                } catch (AuthenticationException e) {
+                    sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 } catch (IllegalArgumentException e) {
                     sendResponse(exchange, 400, "{\"error\":\"Invalid status value. Must be ONLINE or OFFLINE\"}");
                 } catch (Exception e) {
@@ -564,12 +780,21 @@ public class RestApiServer {
                         return;
                     }
                     long driverId = Long.parseLong(params.get("driverId"));
+
+                    User authUser = authenticate(exchange);
+                    if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != driverId) {
+                        sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot view availability of another driver\"}");
+                        return;
+                    }
+
                     Optional<Driver> opt = driverDAO.findById(driverId);
                     if (opt.isEmpty()) {
                         sendResponse(exchange, 404, "{\"error\":\"Driver not found\"}");
                         return;
                     }
-                    sendResponse(exchange, 200, String.format("{\"success\":true,\"driverId\":%d,\"status\":\"%s\"}", driverId, opt.get().getAvailability()));
+                    sendResponse(exchange, 200, String.format(Locale.US, "{\"success\":true,\"driverId\":%d,\"status\":\"%s\"}", driverId, opt.get().getAvailability()));
+                } catch (AuthenticationException e) {
+                    sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 } catch (Exception e) {
                     sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 }
@@ -594,6 +819,13 @@ public class RestApiServer {
                     return;
                 }
                 long driverId = Long.parseLong(params.get("driverId"));
+
+                User authUser = authenticate(exchange);
+                if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != driverId) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot view earnings of another driver\"}");
+                    return;
+                }
+
                 Optional<Driver> opt = driverDAO.findById(driverId);
                 if (opt.isEmpty()) {
                     sendResponse(exchange, 404, "{\"error\":\"Driver not found\"}");
@@ -605,9 +837,11 @@ public class RestApiServer {
                 BigDecimal netEarnings = driver.getTotalEarnings() != null ? driver.getTotalEarnings() : BigDecimal.ZERO;
                 BigDecimal gross = netEarnings.divide(new BigDecimal("0.80"), 2, RoundingMode.HALF_UP);
                 BigDecimal commission = gross.subtract(netEarnings);
-                sendResponse(exchange, 200, String.format(
+                sendResponse(exchange, 200, String.format(Locale.US,
                         "{\"success\":true,\"driverId\":%d,\"netEarnings\":%.2f,\"commission\":%.2f,\"grossRevenue\":%.2f,\"completedTrips\":%d,\"ratingAvg\":%.2f,\"availability\":\"%s\"}",
                         driverId, netEarnings, commission, gross, completedCount, driver.getRatingAvg(), driver.getAvailability()));
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
@@ -620,6 +854,7 @@ public class RestApiServer {
             if (handlePreflight(exchange)) return;
             if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 try {
+                    User authUser = authenticate(exchange);
                     Map<String, String> json = parseSimpleJson(readBody(exchange));
                     long tripId = Long.parseLong(json.get("tripId"));
                     long raterId = Long.parseLong(json.get("raterId"));
@@ -627,9 +862,17 @@ public class RestApiServer {
                     int score = Integer.parseInt(json.get("score"));
                     String comment = json.getOrDefault("comment", "");
 
+                    // Anti-spoofing: caller must be the rater
+                    if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != raterId) {
+                        sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot submit rating on behalf of another user\"}");
+                        return;
+                    }
+
                     Rating rating = ratingService.submitRating(tripId, raterId, rateeId, score, comment);
-                    sendResponse(exchange, 201, String.format("{\"success\":true,\"ratingId\":%d,\"score\":%d}",
+                    sendResponse(exchange, 201, String.format(Locale.US, "{\"success\":true,\"ratingId\":%d,\"score\":%d}",
                             rating.getId(), rating.getScore()));
+                } catch (AuthenticationException e) {
+                    sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 } catch (ValidationException e) {
                     sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
                 } catch (Exception e) {
@@ -710,6 +953,88 @@ public class RestApiServer {
         }
     }
 
+    // --- Authentication & Security Helpers ---
+
+    /**
+     * Authenticates an HTTP request via the Authorization Bearer token header or query parameter,
+     * validating the token against the MySQL {@code session} table and verifying expiration.
+     */
+    public User authenticate(HttpExchange exchange) throws AuthenticationException {
+        String token = extractBearerToken(exchange);
+        if (token == null || token.isBlank()) {
+            throw new AuthenticationException("Missing or invalid Authorization header");
+        }
+
+        String hash = hashToken(token);
+        Optional<Session> optSession = sessionDAO.findByTokenHash(hash);
+        if (optSession.isEmpty()) {
+            // Check direct token match in case raw token was stored
+            optSession = sessionDAO.findByTokenHash(token);
+        }
+
+        if (optSession.isEmpty()) {
+            throw new AuthenticationException("Invalid session token");
+        }
+
+        Session session = optSession.get();
+        if (session.isExpired()) {
+            sessionDAO.deleteByTokenHash(session.getTokenHash());
+            throw new AuthenticationException("Session token has expired");
+        }
+
+        Optional<User> optUser = userDAO.findById(session.getUserId());
+        if (optUser.isEmpty()) {
+            throw new AuthenticationException("User associated with session not found");
+        }
+
+        User user = optUser.get();
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new AuthenticationException("Your account has been suspended");
+        }
+
+        // Bind user to SessionManager for request thread / token context
+        SessionManager.getInstance().login(token, user);
+        return user;
+    }
+
+    public static String extractBearerToken(HttpExchange exchange) {
+        String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
+        if (authHeader != null && !authHeader.isBlank()) {
+            String trimmed = authHeader.trim();
+            if (trimmed.regionMatches(true, 0, "Bearer ", 0, 7)) {
+                return trimmed.substring(7).trim();
+            }
+            return trimmed;
+        }
+        Map<String, String> query = parseQueryParams(exchange.getRequestURI().getQuery());
+        return query.get("token");
+    }
+
+    public static String generateToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        StringBuilder sb = new StringBuilder(64);
+        for (byte b : bytes) {
+            sb.append(String.format(Locale.US, "%02x", b));
+        }
+        return sb.toString();
+    }
+
+    public static String hashToken(String token) {
+        if (token == null) return null;
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(64);
+            for (byte b : digest) {
+                sb.append(String.format(Locale.US, "%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
+    }
+
     // --- Helpers ---
 
     private static boolean handlePreflight(HttpExchange exchange) throws IOException {
@@ -787,78 +1112,10 @@ public class RestApiServer {
 
     /**
      * Robust, dependency-free JSON object parser.
-     * Safely handles string values with commas, colons, spaces, and escaped characters.
+     * Safely handles nested objects, arrays, primitives, numbers, booleans, and character escapes.
      */
     public static Map<String, String> parseSimpleJson(String json) {
-        Map<String, String> map = new HashMap<>();
-        if (json == null || json.isBlank()) return map;
-        String s = json.trim();
-        if (s.startsWith("{")) s = s.substring(1);
-        if (s.endsWith("}")) s = s.substring(0, s.length() - 1);
-
-        int len = s.length();
-        int i = 0;
-        while (i < len) {
-            while (i < len && (Character.isWhitespace(s.charAt(i)) || s.charAt(i) == ',')) i++;
-            if (i >= len) break;
-
-            String key;
-            if (s.charAt(i) == '"') {
-                i++;
-                StringBuilder sb = new StringBuilder();
-                while (i < len) {
-                    char c = s.charAt(i);
-                    if (c == '\\' && i + 1 < len) {
-                        sb.append(s.charAt(i + 1));
-                        i += 2;
-                    } else if (c == '"') {
-                        i++;
-                        break;
-                    } else {
-                        sb.append(c);
-                        i++;
-                    }
-                }
-                key = sb.toString();
-            } else {
-                int start = i;
-                while (i < len && s.charAt(i) != ':' && !Character.isWhitespace(s.charAt(i))) i++;
-                key = s.substring(start, i).trim();
-            }
-
-            while (i < len && s.charAt(i) != ':') i++;
-            if (i < len && s.charAt(i) == ':') i++;
-
-            while (i < len && Character.isWhitespace(s.charAt(i))) i++;
-            if (i >= len) break;
-
-            String val;
-            if (s.charAt(i) == '"') {
-                i++;
-                StringBuilder sb = new StringBuilder();
-                while (i < len) {
-                    char c = s.charAt(i);
-                    if (c == '\\' && i + 1 < len) {
-                        sb.append(s.charAt(i + 1));
-                        i += 2;
-                    } else if (c == '"') {
-                        i++;
-                        break;
-                    } else {
-                        sb.append(c);
-                        i++;
-                    }
-                }
-                val = sb.toString();
-            } else {
-                int start = i;
-                while (i < len && s.charAt(i) != ',' && s.charAt(i) != '}') i++;
-                val = s.substring(start, i).trim();
-            }
-
-            map.put(key, val);
-        }
-        return map;
+        return JsonUtil.parseSimpleJson(json);
     }
 
     private static Map<String, String> parseQueryParams(String query) {

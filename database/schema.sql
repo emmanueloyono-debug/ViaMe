@@ -167,7 +167,9 @@ CREATE TABLE session (
     user_id BIGINT NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     ip_address VARCHAR(45) DEFAULT NULL,
-    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+    INDEX idx_session_expires (expires_at)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
