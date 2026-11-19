@@ -4,22 +4,28 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.viame.dao.DriverDAO;
+import com.viame.dao.FareDAO;
 import com.viame.dao.PassengerDAO;
 import com.viame.dao.SessionDAO;
 import com.viame.dao.UserDAO;
+import com.viame.dao.VehicleDAO;
 import com.viame.dao.impl.DriverDAOImpl;
+import com.viame.dao.impl.FareDAOImpl;
 import com.viame.dao.impl.PassengerDAOImpl;
 import com.viame.dao.impl.SessionDAOImpl;
 import com.viame.dao.impl.UserDAOImpl;
+import com.viame.dao.impl.VehicleDAOImpl;
 import com.viame.exception.AuthenticationException;
 import com.viame.exception.InsufficientFundsException;
 import com.viame.exception.ValidationException;
 import com.viame.model.Driver;
+import com.viame.model.Fare;
 import com.viame.model.Passenger;
 import com.viame.model.Rating;
 import com.viame.model.Session;
 import com.viame.model.Trip;
 import com.viame.model.User;
+import com.viame.model.Vehicle;
 import com.viame.model.enums.DriverAvailability;
 import com.viame.model.enums.PaymentMethod;
 import com.viame.model.enums.TripStatus;
@@ -34,6 +40,7 @@ import com.viame.service.RatingService;
 import com.viame.service.ReportService;
 import com.viame.service.TripService;
 import com.viame.util.AvatarUtil;
+import com.viame.util.InputValidator;
 import com.viame.util.JsonUtil;
 import com.viame.util.MimoAvatarGenerator;
 import com.viame.util.SessionManager;
@@ -88,6 +95,8 @@ public class RestApiServer {
     private final PassengerDAO passengerDAO;
     private final UserDAO userDAO;
     private final SessionDAO sessionDAO;
+    private final VehicleDAO vehicleDAO;
+    private final FareDAO fareDAO;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -147,7 +156,7 @@ public class RestApiServer {
         this(port, new AuthenticationService(), new TripService(), new FareCalculationService(),
                 new PaymentService(), new DriverMatchingService(), new ReportService(),
                 new RatingService(), new DriverDAOImpl(), new PassengerDAOImpl(),
-                new UserDAOImpl(), new SessionDAOImpl());
+                new UserDAOImpl(), new SessionDAOImpl(), new VehicleDAOImpl(), new FareDAOImpl());
     }
 
     public RestApiServer(int port, AuthenticationService authService, TripService tripService,
@@ -155,6 +164,16 @@ public class RestApiServer {
                          DriverMatchingService driverMatchingService, ReportService reportService,
                          RatingService ratingService, DriverDAO driverDAO, PassengerDAO passengerDAO,
                          UserDAO userDAO, SessionDAO sessionDAO) {
+        this(port, authService, tripService, fareService, paymentService, driverMatchingService,
+                reportService, ratingService, driverDAO, passengerDAO, userDAO, sessionDAO,
+                new VehicleDAOImpl(), new FareDAOImpl());
+    }
+
+    public RestApiServer(int port, AuthenticationService authService, TripService tripService,
+                         FareCalculationService fareService, PaymentService paymentService,
+                         DriverMatchingService driverMatchingService, ReportService reportService,
+                         RatingService ratingService, DriverDAO driverDAO, PassengerDAO passengerDAO,
+                         UserDAO userDAO, SessionDAO sessionDAO, VehicleDAO vehicleDAO, FareDAO fareDAO) {
         this.port = port;
         this.authService = authService;
         this.tripService = tripService;
@@ -167,6 +186,8 @@ public class RestApiServer {
         this.passengerDAO = passengerDAO;
         this.userDAO = userDAO;
         this.sessionDAO = sessionDAO;
+        this.vehicleDAO = vehicleDAO;
+        this.fareDAO = fareDAO;
     }
 
     public void start() throws IOException {
@@ -194,6 +215,7 @@ public class RestApiServer {
         server.createContext("/api/fare/estimate", new FareEstimateHandler());
         server.createContext("/api/drivers/available", new AvailableDriversHandler());
         server.createContext("/api/drivers/availability", new DriverAvailabilityHandler());
+        server.createContext("/api/drivers/location", new DriverLocationHandler());
         server.createContext("/api/drivers/earnings", new DriverEarningsHandler());
 
         // 3. Trip Lifecycle Endpoints
@@ -503,7 +525,7 @@ public class RestApiServer {
     }
 
     /**
-     * Handles both status progression (POST) and status query by tripId or passengerId (GET).
+     * Handles both status progression (POST) and status query by tripId, passengerId, or driverId (GET).
      */
     private class TripStatusHandler implements HttpHandler {
         @Override
@@ -513,7 +535,7 @@ public class RestApiServer {
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 try {
                     Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
-                    if (!params.containsKey("tripId") && !params.containsKey("passengerId")) {
+                    if (!params.containsKey("tripId") && !params.containsKey("passengerId") && !params.containsKey("driverId")) {
                         sendResponse(exchange, 400, "{\"error\":\"Missing tripId or passengerId query parameter\"}");
                         return;
                     }
@@ -534,13 +556,24 @@ public class RestApiServer {
                                 return;
                             }
                         }
-                    } else {
+                    } else if (params.containsKey("passengerId")) {
                         long passengerId = Long.parseLong(params.get("passengerId"));
                         if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != passengerId) {
                             sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot view active trips for other passengers\"}");
                             return;
                         }
                         optTrip = tripService.getActiveTripForPassenger(passengerId);
+                    } else {
+                        long driverId = Long.parseLong(params.get("driverId"));
+                        if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != driverId) {
+                            sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot view active trips for other drivers\"}");
+                            return;
+                        }
+                        optTrip = tripService.getTripsForDriver(driverId).stream()
+                                .filter(t -> t.getStatus() != TripStatus.COMPLETED
+                                        && t.getStatus() != TripStatus.CANCELLED
+                                        && t.getStatus() != TripStatus.NO_DRIVER_FOUND)
+                                .findFirst();
                     }
 
                     if (optTrip.isEmpty()) {
@@ -757,14 +790,34 @@ public class RestApiServer {
                         return;
                     }
                     DriverAvailability availability = DriverAvailability.valueOf(statusStr.toUpperCase());
+
+                    boolean hasCoordinates = json.containsKey("lat") && json.containsKey("lng")
+                            && json.get("lat") != null && !json.get("lat").isBlank()
+                            && json.get("lng") != null && !json.get("lng").isBlank();
+                    double lat = 0.0;
+                    double lng = 0.0;
+                    if (hasCoordinates) {
+                        lat = Double.parseDouble(json.get("lat"));
+                        lng = Double.parseDouble(json.get("lng"));
+                        if (!InputValidator.isValidCoordinate(lat, lng)) {
+                            sendResponse(exchange, 400, "{\"error\":\"Invalid GPS coordinates\"}");
+                            return;
+                        }
+                    }
+
                     boolean updated = driverDAO.updateAvailability(driverId, availability);
                     if (!updated) {
                         sendResponse(exchange, 404, "{\"error\":\"Driver not found\"}");
                         return;
                     }
+                    if (hasCoordinates) {
+                        driverDAO.updateLocation(driverId, lat, lng);
+                    }
                     sendResponse(exchange, 200, String.format(Locale.US, "{\"success\":true,\"driverId\":%d,\"status\":\"%s\"}", driverId, availability));
                 } catch (AuthenticationException e) {
                     sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+                } catch (NumberFormatException e) {
+                    sendResponse(exchange, 400, "{\"error\":\"Invalid numeric parameter: " + escapeJson(e.getMessage()) + "\"}");
                 } catch (IllegalArgumentException e) {
                     sendResponse(exchange, 400, "{\"error\":\"Invalid status value. Must be ONLINE or OFFLINE\"}");
                 } catch (Exception e) {
@@ -801,6 +854,51 @@ public class RestApiServer {
                 return;
             }
             sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+        }
+    }
+
+    private class DriverLocationHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (handlePreflight(exchange)) return;
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            try {
+                User authUser = authenticate(exchange);
+                Map<String, String> json = parseSimpleJson(readBody(exchange));
+                if (json.get("driverId") == null || json.get("lat") == null || json.get("lng") == null) {
+                    sendResponse(exchange, 400, "{\"error\":\"Missing driverId, lat, or lng parameter\"}");
+                    return;
+                }
+                long driverId = Long.parseLong(json.get("driverId"));
+
+                if (authUser.getRole() != UserRole.ADMIN && authUser.getId() != driverId) {
+                    sendResponse(exchange, 403, "{\"error\":\"Forbidden: Cannot update location for another driver\"}");
+                    return;
+                }
+
+                double lat = Double.parseDouble(json.get("lat"));
+                double lng = Double.parseDouble(json.get("lng"));
+                if (!InputValidator.isValidCoordinate(lat, lng)) {
+                    sendResponse(exchange, 400, "{\"error\":\"Invalid GPS coordinates\"}");
+                    return;
+                }
+
+                boolean updated = driverDAO.updateLocation(driverId, lat, lng);
+                if (!updated) {
+                    sendResponse(exchange, 404, "{\"error\":\"Driver not found\"}");
+                    return;
+                }
+                sendResponse(exchange, 200, String.format(Locale.US,
+                        "{\"success\":true,\"driverId\":%d,\"lat\":%.6f,\"lng\":%.6f}",
+                        driverId, lat, lng));
+            } catch (AuthenticationException e) {
+                sendResponse(exchange, 401, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                sendResponse(exchange, 400, "{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+            }
         }
     }
 
@@ -1062,7 +1160,7 @@ public class RestApiServer {
         }
     }
 
-    private static String formatTripJson(Trip trip) {
+    private String formatTripJson(Trip trip) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("success", true);
         map.put("tripId", trip.getId());
@@ -1083,10 +1181,45 @@ public class RestApiServer {
         map.put("startedAt", trip.getStartedAt() != null ? trip.getStartedAt().toString() : null);
         map.put("completedAt", trip.getCompletedAt() != null ? trip.getCompletedAt().toString() : null);
         map.put("cancelledAt", trip.getCancelledAt() != null ? trip.getCancelledAt().toString() : null);
+
+        if (fareDAO != null) {
+            fareDAO.findByRideId(trip.getId()).ifPresent(fare -> {
+                map.put("totalAmount", fare.getTotalAmount());
+                map.put("estimatedFare", fare.getTotalAmount());
+                map.put("baseFare", fare.getBaseFare());
+                map.put("distanceFare", fare.getDistanceComponent());
+                map.put("timeFare", fare.getTimeComponent());
+                map.put("surgeMultiplier", fare.getSurgeMultiplier());
+                map.put("currency", fare.getCurrency());
+            });
+        }
+
+        if (trip.getDriverId() != null && driverDAO != null) {
+            driverDAO.findById(trip.getDriverId()).ifPresent(d -> {
+                map.put("driverName", d.getFullName());
+                map.put("driverPhone", d.getPhone());
+                map.put("driverLicence", d.getLicenceNumber());
+                map.put("driverRating", d.getRatingAvg());
+                map.put("driverAvatarUrl", AvatarUtil.getLocalApiUrl(d.getEmail(), MimoAvatarGenerator.Mood.COOL));
+            });
+        }
+
+        if ((trip.getVehicleId() != null || trip.getDriverId() != null) && vehicleDAO != null) {
+            Optional<Vehicle> optVehicle = trip.getVehicleId() != null
+                    ? vehicleDAO.findById(trip.getVehicleId())
+                    : vehicleDAO.findByDriverId(trip.getDriverId());
+            optVehicle.ifPresent(v -> {
+                map.put("vehicleMake", v.getMake());
+                map.put("vehicleModel", v.getModel());
+                map.put("vehiclePlate", v.getPlateNumber());
+                map.put("vehicleSeats", v.getSeats());
+            });
+        }
+
         return JsonUtil.toJson(map);
     }
 
-    private static Map<String, Object> formatTripSummary(Trip t) {
+    private Map<String, Object> formatTripSummary(Trip t) {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("tripId", t.getId());
         item.put("passengerId", t.getPassengerId());
@@ -1101,6 +1234,16 @@ public class RestApiServer {
         item.put("durationMin", t.getDurationMin());
         item.put("status", t.getStatus() != null ? t.getStatus().name() : null);
         item.put("requestedAt", t.getRequestedAt() != null ? t.getRequestedAt().toString() : null);
+
+        if (fareDAO != null) {
+            fareDAO.findByRideId(t.getId()).ifPresent(fare -> {
+                item.put("totalAmount", fare.getTotalAmount());
+                item.put("estimatedFare", fare.getTotalAmount());
+                item.put("surgeMultiplier", fare.getSurgeMultiplier());
+                item.put("currency", fare.getCurrency());
+            });
+        }
+
         return item;
     }
 

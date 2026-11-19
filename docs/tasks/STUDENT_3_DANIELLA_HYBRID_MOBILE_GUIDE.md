@@ -72,7 +72,10 @@ npx cap init ViaMe com.viame.mobile --web-dir=dist
 Start the backend (from the repo root, in another terminal) and the mobile dev server:
 
 ```bash
-# Backend REST API (port 8080) — MySQL must be running with database/schema.sql loaded
+# Option A: One-click REST API launcher on port 8080 (Windows)
+.\run-api.bat          # or: .\run-api.ps1
+
+# Option B: Maven CLI — MySQL must be running with database/schema.sql loaded
 mvn compile exec:java -Dexec.mainClass=com.viame.api.RestApiServer
 
 # Mobile app
@@ -105,7 +108,8 @@ mobile/
 ## 4. Screens to Build
 
 ### 4.1 Login & Register
-- [ ] Email + password login → `POST /api/auth/login` → store `userId`, `role`, `avatarUrl` → go to `/passenger` or `/driver` based on `role`.
+- [ ] Email + password login → `POST /api/auth/login` → store `token`, `userId`, `role`, `avatarUrl` in `localStorage` → go to `/passenger` or `/driver` based on `role`.
+- [ ] Logout button → `POST /api/auth/logout` (with `Authorization: Bearer <token>`) and clear `localStorage`.
 - [ ] "Demo Passenger" / "Demo Driver" quick-fill buttons for the oral defense.
 - [ ] Register tab toggle: **Passenger** (name, phone, email, password, payment method) / **Driver** (+ licence number, plate number, make, model, seats).
 - [ ] Show the backend `error` message on failure (e.g. HTTP 401).
@@ -119,18 +123,19 @@ mobile/
   - ⚠️ This endpoint does **not** return driver GPS coordinates, so drivers cannot be placed accurately on the map. Show them as a list, or place them around the pickup as clearly decorative "radar" dots.
 - [ ] Payment selector: `WALLET` / `CASH`.
 - [ ] **Request ride** → `POST /api/trips/request`. On **HTTP 402** (insufficient funds) open the wallet top-up sheet.
-- [ ] **Status stepper**: `REQUESTED → ASSIGNED → DRIVER_EN_ROUTE → ARRIVED → IN_PROGRESS → COMPLETED` (plus `CANCELLED`, `NO_DRIVER_FOUND`).
+- [ ] **Status stepper & Driver card**: poll `GET /api/trips/status?passengerId=<id>` (`REQUESTED → ASSIGNED → DRIVER_EN_ROUTE → ARRIVED → IN_PROGRESS → COMPLETED`). Once assigned, render `driverName`, `driverPhone`, `driverRating`, `driverAvatarUrl`, `vehicleMake`, `vehicleModel`, `vehiclePlate`, and `totalAmount` directly from the response.
 - [ ] **Cancel ride** → `POST /api/trips/cancel`.
-- [ ] **Wallet top-up sheet** → `POST /api/wallet/topup` (minimum **500 XAF**, enforced by the backend).
-- [ ] **Rating sheet** (1–5 stars + comment) after `COMPLETED` — see §8 gap G5.
+- [ ] **Wallet top-up & balance** → `GET /api/wallet/balance?passengerId=<id>` and `POST /api/wallet/topup` (minimum **500 XAF**, enforced by the backend).
+- [ ] **Rating sheet** (1–5 stars + comment) after `COMPLETED` → `POST /api/ratings`.
 
 ### 4.3 Driver Screen
-- [ ] **ONLINE / OFFLINE** toggle — see §8 gap G3.
-- [ ] **Incoming ride radar modal**: pickup, dropoff, fare, **30-second countdown ring**, sound + `navigator.vibrate([200,100,200])`, buttons **Accept** / **Decline** — see §8 gap G2 for how requests are discovered.
+- [ ] **ONLINE / OFFLINE** toggle → `POST /api/drivers/availability` (optionally passing `lat`, `lng`) and/or `POST /api/drivers/location` to sync simulated GPS coordinates.
+- [ ] **Incoming ride radar modal**: poll `GET /api/trips/pending`, showing pickup, dropoff, distance, **`totalAmount` (XAF)**, **30-second countdown ring**, sound + `navigator.vibrate([200,100,200])`, and **Accept** / **Decline** buttons.
+- [ ] **Recover active trip on reload**: call `GET /api/trips/status?driverId=<id>` on mount.
 - [ ] **Accept** → `POST /api/trips/accept`. If the call fails (another driver took it first — pessimistic locking), show "Ride already taken".
 - [ ] **Sequential action button** → `POST /api/trips/status` with `action`:
   `EN_ROUTE` ("Driver En Route") → `ARRIVED` ("Arrived at Pickup") → `START` ("Start Ride") → `COMPLETE` ("Complete Ride").
-- [ ] **Earnings card**: gross, 20% platform commission, 80% driver payout (computed client-side from completed fares in the current session, until gap G6 is closed).
+- [ ] **Earnings card** → `GET /api/drivers/earnings?driverId=<id>`: displays `grossRevenue`, 20% `commission`, 80% `netEarnings`, `completedTrips`, and `ratingAvg`.
 
 ### 4.4 UX rules
 - Thumb-reachable primary buttons at the bottom; minimum touch target 44 px.
@@ -149,14 +154,17 @@ VITE_API_BASE=http://10.0.2.2:8080      # Android emulator → your PC's localho
 # VITE_API_BASE=http://192.168.1.50:8080   # phone on the same Wi-Fi → your PC's LAN IP
 ```
 
-### 5.2 Native CORS & JSON Support (Fully Configured in Backend)
-`RestApiServer` now natively handles HTTP `OPTIONS` preflight requests returning `204 No Content` with:
+### 5.2 Native CORS, Bearer Token Auth & JSON Support (Enforced in Backend)
+`RestApiServer` handles HTTP `OPTIONS` preflight requests returning `204 No Content` with:
 - `Access-Control-Allow-Origin: *`
 - `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`
 - `Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With`
 
-You can use standard `Content-Type: application/json` directly with `fetch` or `axios`.
-Furthermore, the backend JSON parser is now token-aware and safely handles string values containing commas (e.g. `"Akwa Palace Hotel, Douala"`) and colons without truncation.
+> [!IMPORTANT]
+> **Session Token Authentication & Anti-Spoofing (Nov 2026):**  
+> Protected endpoints (trips, wallet, ratings `POST`, driver duty/location/earnings) **require** `Authorization: Bearer <token>` returned by `POST /api/auth/login`. Calling them without a valid token returns `401 Unauthorized`, and supplying another user's `passengerId`/`driverId`/`userId` returns `403 Forbidden`.
+
+Use standard `Content-Type: application/json` and attach the stored Bearer token automatically in `src/api/client.ts`. The backend JSON parser (`JsonUtil`) is a full recursive-descent parser supporting nested objects, arrays, numbers, booleans, and string values containing commas or colons.
 
 ```ts
 // src/api/client.ts
@@ -166,10 +174,18 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
+function authHeaders(withJsonBody = false): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (withJsonBody) headers['Content-Type'] = 'application/json';
+  const token = localStorage.getItem('viame_token');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
 export async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(true),
     body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -178,7 +194,9 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${BASE}${path}`, {
+    headers: authHeaders(false),
+  });
   const data = await res.json();
   if (!res.ok) throw new ApiError(res.status, data.error ?? 'Request failed');
   return data as T;
@@ -213,32 +231,34 @@ export default config;
 
 ## 6. REST Contract (verified against `RestApiServer.java`)
 
-All endpoints are fully implemented and verified in [`RestApiServer.java`](../../src/main/java/com/viame/api/RestApiServer.java):
+All endpoints are fully implemented and verified in [`RestApiServer.java`](../../src/main/java/com/viame/api/RestApiServer.java). Endpoints marked **🔒 Bearer** require `Authorization: Bearer <token>`.
 
-| Category | Endpoint | Method | Request body / query | Success response |
-| :--- | :--- | :---: | :--- | :--- |
-| **Auth** | `/api/auth/login` | `POST` | `{email, password}` | `200 {success, userId, email, role, status, avatarUrl}` · `401 {error}` |
-| **Auth** | `/api/auth/register/passenger` | `POST` | `{email, phone, password, fullName, paymentMethod?}` (`WALLET` default) | `201 {success, userId, fullName, walletBalance}` |
-| **Auth** | `/api/auth/register/driver` | `POST` | `{email, phone, password, fullName, licenceNumber, plateNumber, make, model, seats?}` | `201 {success, userId, verificationStatus}` |
-| **Fare** | `/api/fare/estimate` | `POST` | `{pickupLat, pickupLng, dropoffLat, dropoffLng}` | `200 {distanceKm, durationMin, baseFare, surge, totalAmount, currency}` |
-| **Dispatch** | `/api/drivers/available` | `GET` | `?lat=&lng=&radius=` | `200 {count, drivers:[{driverId, name, distanceKm, rating, avatarUrl}]}` |
-| **Driver Duty** | `/api/drivers/availability` | `POST` | `{driverId, status}` (`ONLINE` / `OFFLINE`) | `200 {success, driverId, status}` |
-| **Driver Duty** | `/api/drivers/availability` | `GET` | `?driverId=` | `200 {success, driverId, status}` |
-| **Driver Earnings**| `/api/drivers/earnings` | `GET` | `?driverId=` | `200 {success, driverId, netEarnings, commission, grossRevenue, completedTrips, ratingAvg, availability}` |
-| **Trips** | `/api/trips/request` | `POST` | `{passengerId, pickupLat, pickupLng, pickupAddress, dropoffLat, dropoffLng, dropoffAddress, paymentMethod}` | `201 {success, tripId, status, distanceKm, durationMin}` · `402` insufficient funds |
-| **Trips** | `/api/trips/accept` | `POST` | `{tripId, driverId}` | `200 {success, tripId, status, driverId}` · `400` if already taken |
-| **Trips** | `/api/trips/status` | `GET` | `?tripId=` OR `?passengerId=` | `200 {success, tripId, passengerId, driverId, status, pickupAddress, dropoffAddress, distanceKm, ...}` |
-| **Trips** | `/api/trips/status` | `POST` | `{tripId, driverId, action, paymentMethod?}` — `action` ∈ `EN_ROUTE`, `ARRIVED`, `START`, `COMPLETE` | `200 {success, tripId, status, ...}` |
-| **Trips** | `/api/trips/pending` | `GET` | — | `200 {count, trips:[{tripId, passengerId, pickupAddress, dropoffAddress, ...}]}` (Driver Radar) |
-| **Trips** | `/api/trips/cancel` | `POST` | `{tripId, userId, isPassenger}` | `200 {success, tripId, status}` |
-| **Wallet** | `/api/wallet/balance` | `GET` | `?passengerId=` | `200 {success, passengerId, balance}` |
-| **Wallet** | `/api/wallet/topup` | `POST` | `{passengerId, amount, provider?}` | `200 {success, passengerId, newBalance}` |
-| **Ratings** | `/api/ratings` | `POST` | `{tripId, raterId, rateeId, score, comment?}` | `201 {success, ratingId, score}` |
-| **Ratings** | `/api/ratings` | `GET` | `?userId=` | `200 {userId, count, ratings:[...]}` |
-| **Avatar** | `/api/avatar` | `GET` | `?seed=&mood=&size=&shape=&animated=` | SVG image (use directly in `<img src>`) |
-| **Health** | `/api/health` | `GET` | — | `200 {status:"UP"}` |
+| Category | Endpoint | Auth | Method | Request body / query | Success response |
+| :--- | :--- | :---: | :---: | :--- | :--- |
+| **Auth** | `/api/auth/login` | Public | `POST` | `{email, password}` | `200 {success, token, sessionToken, userId, email, role, status, avatarUrl, expiresAt}` · `401 {error}` |
+| **Auth** | `/api/auth/logout` | Optional Bearer | `POST` | `{}` | `200 {success, message}` |
+| **Auth** | `/api/auth/register/passenger` | Public | `POST` | `{email, phone, password, fullName, paymentMethod?}` (`WALLET` default) | `201 {success, userId, fullName, walletBalance}` |
+| **Auth** | `/api/auth/register/driver` | Public | `POST` | `{email, phone, password, fullName, licenceNumber, plateNumber, make, model, seats?}` | `201 {success, userId, verificationStatus}` |
+| **Fare** | `/api/fare/estimate` | Public | `POST` | `{pickupLat, pickupLng, dropoffLat, dropoffLng}` | `200 {distanceKm, durationMin, baseFare, surge, totalAmount, currency}` |
+| **Dispatch** | `/api/drivers/available` | Public | `GET` | `?lat=&lng=&radius=` | `200 {count, drivers:[{driverId, name, distanceKm, rating, avatarUrl}]}` |
+| **Driver Duty** | `/api/drivers/availability` | 🔒 Bearer | `POST` | `{driverId, status, lat?, lng?}` (`ONLINE` / `OFFLINE`) | `200 {success, driverId, status}` |
+| **Driver Duty** | `/api/drivers/availability` | 🔒 Bearer | `GET` | `?driverId=` | `200 {success, driverId, status}` |
+| **Driver GPS** | `/api/drivers/location` | 🔒 Bearer | `POST` | `{driverId, lat, lng}` | `200 {success, driverId, lat, lng}` |
+| **Driver Earnings**| `/api/drivers/earnings` | 🔒 Bearer | `GET` | `?driverId=` | `200 {success, driverId, netEarnings, commission, grossRevenue, completedTrips, ratingAvg, availability}` |
+| **Trips** | `/api/trips/request` | 🔒 Bearer (`PASSENGER`) | `POST` | `{passengerId, pickupLat, pickupLng, pickupAddress, dropoffLat, dropoffLng, dropoffAddress, paymentMethod}` | `201 {success, tripId, status, distanceKm, durationMin}` · `402` insufficient funds |
+| **Trips** | `/api/trips/accept` | 🔒 Bearer (`DRIVER`) | `POST` | `{tripId, driverId}` | `200 {success, tripId, status, driverId}` · `400` if already taken |
+| **Trips** | `/api/trips/status` | 🔒 Bearer | `GET` | `?tripId=` OR `?passengerId=` OR `?driverId=` | `200 {success, tripId, passengerId, driverId, vehicleId, status, pickupAddress, dropoffAddress, distanceKm, durationMin, totalAmount, estimatedFare, baseFare, distanceFare, timeFare, surgeMultiplier, currency, driverName?, driverPhone?, driverLicence?, driverRating?, driverAvatarUrl?, vehicleMake?, vehicleModel?, vehiclePlate?, vehicleSeats?}` |
+| **Trips** | `/api/trips/status` | 🔒 Bearer (`DRIVER`) | `POST` | `{tripId, driverId, action, paymentMethod?}` — `action` ∈ `EN_ROUTE`, `ARRIVED`, `START`, `COMPLETE` | `200` (same enriched trip JSON as `GET /api/trips/status`) |
+| **Trips** | `/api/trips/pending` | 🔒 Bearer (`DRIVER`) | `GET` | — | `200 {count, trips:[{tripId, passengerId, pickupAddress, dropoffAddress, pickupLat, pickupLng, dropoffLat, dropoffLng, distanceKm, durationMin, status, requestedAt, totalAmount, estimatedFare, surgeMultiplier, currency}]}` (Driver Radar) |
+| **Trips** | `/api/trips/cancel` | 🔒 Bearer | `POST` | `{tripId, userId, isPassenger}` | `200` (same enriched trip JSON) |
+| **Wallet** | `/api/wallet/balance` | 🔒 Bearer | `GET` | `?passengerId=` | `200 {success, passengerId, balance}` |
+| **Wallet** | `/api/wallet/topup` | 🔒 Bearer | `POST` | `{passengerId, amount, provider?}` | `200 {success, passengerId, newBalance}` |
+| **Ratings** | `/api/ratings` | 🔒 Bearer | `POST` | `{tripId, raterId, rateeId, score, comment?}` | `201 {success, ratingId, score}` |
+| **Ratings** | `/api/ratings` | Public | `GET` | `?userId=` | `200 {userId, count, ratings:[...]}` |
+| **Avatar** | `/api/avatar` | Public | `GET` | `?seed=&mood=&size=&shape=&animated=` | SVG image (use directly in `<img src>`) |
+| **Health** | `/api/health` | Public | `GET` | — | `200 {status:"UP"}` |
 
-All errors return standard HTTP status codes with `{"error": "..."}`.
+All errors return standard HTTP status codes (`400`, `401`, `402`, `403`, `404`, `405`) with `{"error": "..."}`.
 All endpoints support CORS `OPTIONS` preflight requests (`204 No Content`).
 
 ---
@@ -294,18 +314,19 @@ export function MapView({ pickup, dropoff, onPick }: {
 
 ---
 
-## 8. Backend Status: All Endpoints Live (Zero Mocks Needed!)
+## 8. Backend Status: All Endpoints, Auth & Payload Enrichments Live (Zero Mocks Needed!)
 
 > [!IMPORTANT]
 > **COMPLETED & DEPLOYED (Nov 2026):**  
-> All 7 previously identified gaps (G1 through G7) have been implemented, tested, and pushed directly to `RestApiServer.java` on `main`:
-> 1. ✅ **`GET /api/trips/status?tripId=...` & `GET /api/trips/status?passengerId=...`**: Live passenger status polling.
-> 2. ✅ **`GET /api/trips/pending`**: Live driver radar pending requests polling.
-> 3. ✅ **`POST /api/drivers/availability`**: Driver duty switch (`ONLINE` / `OFFLINE`).
-> 4. ✅ **`GET /api/wallet/balance?passengerId=...`**: Instant passenger wallet balance lookup.
-> 5. ✅ **`POST /api/ratings`**: 1-to-5 star evaluation submission for completed trips.
-> 6. ✅ **`GET /api/drivers/earnings?driverId=...`**: Driver earnings card (gross, 20% commission, net payout, trips count, rating).
-> 7. ✅ **Native CORS `OPTIONS` Preflight & Comma-Safe JSON**: Standard `application/json` is supported on all endpoints without workarounds.
+> All backend endpoints, Bearer token security, and payload enrichments are implemented, verified (152 tests passing including live `MobileDesktopBackendBridgeTest`), and pushed to `main` in `RestApiServer.java`:
+> 1. ✅ **Session Token Auth & Logout**: `POST /api/auth/login` issues a 24h Bearer `token` stored in the MySQL `session` table; `POST /api/auth/logout` revokes it. Protected endpoints validate `Authorization: Bearer <token>`, caller role, and ID anti-spoofing.
+> 2. ✅ **`GET /api/trips/status?tripId=...`, `?passengerId=...`, or `?driverId=...`**: Live passenger & driver active-trip lookup returning enriched fare (`totalAmount`, `estimatedFare`), assigned driver (`driverName`, `driverPhone`, `driverRating`, `driverAvatarUrl`), and vehicle (`vehicleMake`, `vehicleModel`, `vehiclePlate`, `vehicleSeats`).
+> 3. ✅ **`GET /api/trips/pending`**: Live driver radar polling including `totalAmount` / `estimatedFare` / `currency`.
+> 4. ✅ **`POST /api/drivers/availability` & `POST /api/drivers/location`**: Driver duty switch (`ONLINE` / `OFFLINE`, with optional `lat`/`lng`) and GPS coordinate updates.
+> 5. ✅ **`GET /api/wallet/balance?passengerId=...` & `POST /api/wallet/topup`**: Instant wallet balance lookup and atomic top-up.
+> 6. ✅ **`POST /api/ratings` & `GET /api/ratings?userId=...`**: 1-to-5 star evaluation submission and lookup.
+> 7. ✅ **`GET /api/drivers/earnings?driverId=...`**: Driver earnings card (gross, 20% commission, net payout, trips count, rating).
+> 8. ✅ **Native CORS `OPTIONS` Preflight, `Locale.US` JSON & Recursive Parser**: Standard `application/json` with `Authorization` header works across all endpoints without workarounds.
 >
 > You can now connect all mobile screens directly to the real backend with **zero mocked data**.
 
@@ -398,7 +419,8 @@ git push -u origin feature/daniella-mobile-ui
 You are helping Student 3 (Daniella) build the ViaMe hybrid mobile client in mobile/
 (Vite + React + TypeScript + Tailwind + react-leaflet + vite-plugin-pwa + Capacitor Android).
 Follow the guide exactly: use the REST contract in §6 (field names as in RestApiServer.java),
-send POST bodies with Content-Type text/plain, flat JSON with no commas in string values,
-Douala hotspots from §7, and put G1–G6 behind mockable functions in src/api/endpoints.ts.
+send standard Content-Type: application/json requests, store the login Bearer token in
+localStorage ('viame_token') and attach Authorization: Bearer <token> to protected API calls,
+use the Douala hotspots from §7, and connect directly to the live endpoints in §6/§8.
 Never add database access to the mobile app. Do not modify any file outside mobile/.
 ```

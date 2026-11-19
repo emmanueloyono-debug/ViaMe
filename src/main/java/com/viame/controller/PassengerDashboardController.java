@@ -23,13 +23,28 @@ public class PassengerDashboardController {
 
     private final AuthenticationService authenticationService = new AuthenticationService();
 
+    protected Passenger currentPassenger;
+
     @FXML
     public void initialize() {
-        SessionManager.getInstance().getCurrentUser().ifPresent(this::bindUser);
+        if (currentPassenger == null) {
+            SessionManager.getInstance().getCurrentUser().ifPresent(this::bindUser);
+        }
+    }
+
+    public void setPassenger(Passenger passenger) {
+        this.currentPassenger = passenger;
+        if (passenger != null) {
+            bindUser(passenger);
+        }
     }
 
     protected void bindUser(User user) {
+        if (user == null) {
+            return;
+        }
         if (user instanceof Passenger passenger) {
+            this.currentPassenger = passenger;
             if (userHeaderLabel != null) {
                 userHeaderLabel.setText(passenger.getFullName() + " (" + passenger.getEmail() + ")");
             }

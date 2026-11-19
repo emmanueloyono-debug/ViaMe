@@ -11,15 +11,15 @@
 
 ## 👥 Engineering Team & Task Allocation Matrix (Group of 4)
 
-> **Current System Status:** **~85% Overall Completion** achieved through Sprints 1, 2, and Backend Core Completion.  
-> **Student 2 (Software Architect & Backend Core Engineer)** has delivered the entire 5-tier backend foundation, all 12 DAOs, 9 business services (including `ReportService`), security infrastructure, JavaFX `MainApp` launcher, authentication views, **`RestApiServer` with 17 REST endpoints**, 34 passing unit tests, and the `TC-CONC-01` multi-threaded double-acceptance test.
+> **Current System Status:** **Backend & Database 100% Complete (~75% Overall Completion)** — Ready for UI & Mobile Wiring.  
+> **Student 2 (Software Architect & Backend Core Engineer)** has delivered the entire 5-tier backend foundation, all 12 DAOs (including `SessionDAO`), 10 business services (including `AdminService` & `ReportService`), multi-window session isolation, **`RestApiServer` with 23 REST endpoints secured by Bearer tokens & RBAC**, **152 passing tests across 39 test classes** (including `TC-CONC-01` & live `MobileDesktopBackendBridgeTest`), portable desktop/API launchers, and JavaFX authentication views.
 
 | Role & Focus | Assigned Student | Current Status & Core Deliverables | Next Actions & Implementation Guide |
 | :--- | :--- | :--- | :--- |
-| **Student 1: System Analyst & Database Engineer** | **SIMEN** | **100% Completed & Merged into `main`:** 10 Use Case specifications, Physical Relational ERD, 3NF Normalization justification (`docs/3NF_NORMALIZATION_JUSTIFICATION.md`), and verified runnable `database/schema.sql` with bounded rating trigger & expanded Douala seed data. | • Maintain local MySQL 8.0 database instance.<br>• Defend 3NF Normalization proofs and trigger logic during oral defense.<br>👉 **[Simen's Implementation Guide](docs/tasks/STUDENT_1_SIMEN_DATABASE_GUIDE.md)** |
-| **Student 2: Software Architect & Backend Core Engineer** | **Emmanuel Oyono** *(Project Lead & Architecture Reviewer)* | **85% Completed (Core Backend & BI Done):**<br>• Full 5-tier architecture & domain models (`User`, `Passenger`, `Driver`, `Trip`, `Fare`, `Payment`, `ReportRows`, etc.).<br>• Complete DAO Layer (12 DAOs): `UserDAO`, `PassengerDAO`, `DriverDAO`, `VehicleDAO`, `TripDAO`, `PaymentDAO`, `PricingRuleDAO`, `FareDAO`, `RatingDAO`, `AuditLogDAO`, `ReportDAO`, and `TransactionManager`.<br>• Full Service Layer (9 Services): `AuthenticationService` (BCrypt), `TripService` (pessimistic locking & state machine), `FareCalculationService` (dynamic surge strategy), `DriverMatchingService` (Haversine), `PaymentService` (ACID wallet & cash settlement), `RatingService`, `CancellationPolicy`, `ReportService` (5 BI reports + RFC-4180 CSV export).<br>• **REST API Server (`RestApiServer.java`):** 17 standard HTTP REST endpoints enabling **Android $\to$ REST API $\to$ Java backend $\to$ MySQL** without direct DB coupling.<br>• Full Test Suite: 34 unit tests passing with 100% success rate + `TC-CONC-01` multi-threaded race condition test.<br>• Desktop Application Shell: `MainApp.java`, `styles.css`, `LoginView.fxml`, `RegisterView.fxml`. | • Code review and test verification of all collaborator Pull Requests.<br>• Authorize all merges into `main`.<br>• Assist team with Android REST client integration. |
-| **Student 3: UI/UX & Mobile / Desktop Application Developer** | **DANIELLA** | **Ready for Sprint 3 (Part 1 of Remaining Work):** Desktop FXML layout shells and controller classes created; REST API endpoints live. | **Execute Part 1 (Sprint 3):**<br>• Build Android app connecting via REST API: Passenger screen (route estimation, booking, wallet, tracking, rating) and Driver screen (duty toggle, incoming radar alert, sequential state actions).<br>• Finalize interactive JavaFX simulation client for Passenger and Driver views consuming backend services.<br>👉 **[Daniella's Implementation Guide](docs/tasks/STUDENT_3_DANIELLA_MOBILE_UI_GUIDE.md)**<br>📱 **[Hybrid Mobile Guide (PWA + Android APK, Leaflet maps)](docs/tasks/STUDENT_3_DANIELLA_HYBRID_MOBILE_GUIDE.md)** |
-| **Student 4: QA, Security & Deployment Engineer** | **DELMA** | **Ready for Sprints 4 & 5 (Parts 2 & 3 of Remaining Work):** Backend `ReportService` and `TC-CONC-01` concurrency harness ready. | **Execute Parts 2 & 3 (Sprints 4 & 5):**<br>• Embed visual charts (`BarChart`, `PieChart`, `LineChart`) into `AdminConsole.fxml` wired to `ReportService`.<br>• Implement driver verification (`AD-2`) and pricing rule configurator (`AD-3`) UI actions in `AdminConsole`.<br>• Prepare oral defense presentation slide deck.<br>👉 **[Delma's Implementation Guide](docs/tasks/STUDENT_4_DELMA_QA_ADMIN_GUIDE.md)** |
+| **Student 1: System Analyst & Database Engineer** | **SIMEN** | **100% Completed & Merged into `main`:** 10 Use Case specifications, Physical Relational ERD, 3NF Normalization justification (`docs/3NF_NORMALIZATION_JUSTIFICATION.md`), and verified runnable `database/schema.sql` with bounded rating trigger, indexed `session` table & expanded Douala seed data. | • Maintain local MySQL 8.0 database instance.<br>• Defend 3NF Normalization proofs and trigger logic during oral defense.<br>👉 **[Simen's Implementation Guide](docs/tasks/STUDENT_1_SIMEN_DATABASE_GUIDE.md)** |
+| **Student 2: Software Architect & Backend Core Engineer** | **Emmanuel Oyono** *(Project Lead & Architecture Reviewer)* | **100% Completed (Backend Core, REST Mobile Backend & DB Verified):**<br>• Full 5-tier architecture & domain models (`User`, `Passenger`, `Driver`, `Trip`, `Fare`, `Payment`, `Session`, `ReportRows`, etc.).<br>• Complete DAO Layer (12 DAOs + `TransactionManager`): `UserDAO`, `PassengerDAO`, `DriverDAO`, `VehicleDAO`, `TripDAO`, `PaymentDAO`, `PricingRuleDAO`, `FareDAO`, `RatingDAO`, `AuditLogDAO`, `ReportDAO`, `SessionDAO`.<br>• Full Service Layer (10 Services): `AuthenticationService` (BCrypt), `TripService` (pessimistic locking & state machine), `FareCalculationService` (dynamic surge strategy), `DriverMatchingService` (Haversine), `PaymentService` (ACID wallet & cash settlement), `RatingService`, `CancellationPolicy`, `ReportService` (5 BI reports + RFC-4180 CSV export), `AdminService` (`AD-2` onboarding & `AD-3` tariff management).<br>• **REST API Server (`RestApiServer.java`):** 23 HTTP REST endpoints with Bearer token auth, RBAC, anti-ID spoofing, `Locale.US` JSON formatting, and enriched mobile driver/fare payloads.<br>• **Full Test Suite:** **152 tests across 39 test classes** passing with 0 failures/errors/skips, including `TC-CONC-01` concurrency and live `MobileDesktopBackendBridgeTest`.<br>• **Desktop Shell & Launchers:** `MainApp.java` (multi-window session context), `styles.css`, `LoginView.fxml`, `RegisterView.fxml`, `run-desktop.bat/.ps1`, `run-api.bat/.ps1`. | • Code review and test verification of collaborator Pull Requests.<br>• Authorize all merges into `main`.<br>• Support Daniella & Delma with mobile REST and JavaFX service integration. |
+| **Student 3: UI/UX & Mobile / Desktop Application Developer** | **DANIELLA** | **Ready for Sprint 3 (Part 1 of Remaining Work):** Desktop FXML layout shells (`setPassenger`/`setDriver` context hooks) ready; REST API mobile backend & CORS/Bearer auth live (`run-api.bat`). | **Execute Part 1 (Sprint 3):**<br>• Build hybrid mobile client (`mobile/` Vite + React + Leaflet PWA + Capacitor Android APK) consuming `RestApiServer` with `Authorization: Bearer <token>`.<br>• Wire interactive JavaFX Passenger and Driver dashboards (`PassengerDashboardController`, `DriverDashboardController`) to backend services.<br>👉 **[Daniella's Implementation Guide](docs/tasks/STUDENT_3_DANIELLA_MOBILE_UI_GUIDE.md)**<br>📱 **[Hybrid Mobile Guide (PWA + Android APK, Leaflet maps)](docs/tasks/STUDENT_3_DANIELLA_HYBRID_MOBILE_GUIDE.md)** |
+| **Student 4: QA, Security & Deployment Engineer** | **DELMA** | **Ready for Sprints 4 & 5 (Parts 2 & 3 of Remaining Work):** Backend `AdminService`, `ReportService`, and `TC-CONC-01` concurrency harness ready. | **Execute Parts 2 & 3 (Sprints 4 & 5):**<br>• Embed visual charts (`BarChart`, `PieChart`, `LineChart`) into `AdminConsole.fxml` wired to `ReportService`.<br>• Wire fleet monitoring, driver verification (`AD-2`), and pricing rule configurator (`AD-3`) in `AdminDashboardController` via `AdminService`.<br>• Configure fat-JAR packaging & prepare oral defense presentation slide deck.<br>👉 **[Delma's Implementation Guide](docs/tasks/STUDENT_4_DELMA_QA_ADMIN_GUIDE.md)** |
 
 > [!IMPORTANT]
 > ### 🛡️ Repository Merge & Branch Governance Protocol
@@ -122,27 +122,36 @@ graph LR
 2. **Java REST API & Backend Server (Student 2):**
    - Central business logic host: BCrypt authentication, fare strategy, dispatch matching, and ACID transactions.
    - Built-in lightweight [`RestApiServer.java`](src/main/java/com/viame/api/RestApiServer.java) running on port `8080` without external dependency bloat.
-   - **REST API Endpoints Specification:**
+   - **REST API Endpoints Specification** (*🔒 = requires `Authorization: Bearer <token>` from `/api/auth/login`*):
 
-     | Category | Method & Path | Query / Body Parameters | Response Description |
-     | :--- | :--- | :--- | :--- |
-     | **System** | `GET /api/health` | None | System status and service health check (`{"status":"UP"}`) |
-     | **Auth** | `POST /api/auth/login` | `{"email": "...", "password": "..."}` | Session token, user ID, role, and profile info |
-     | **Auth** | `POST /api/auth/register/passenger` | `{"email": "...", "password": "...", "phone": "...", "fullName": "..."}` | Registered passenger ID and initial wallet |
-     | **Auth** | `POST /api/auth/register/driver` | `{"email": "...", "password": "...", "phone": "...", "fullName": "...", "licence": "...", "plate": "...", "make": "...", "model": "..."}` | Registered driver ID with `PENDING` verification status |
-     | **Fare** | `POST /api/fare/estimate` | `{"pickupLat": 4.05, "pickupLng": 9.76, "dropoffLat": 4.07, "dropoffLng": 9.71}` | Distance (km), duration (min), surge multiplier, estimated fare |
-     | **Dispatch** | `GET /api/drivers/available` | `?lat=4.05&lng=9.76&radius=5.0` | List of nearby online drivers with GPS coordinates and ratings |
-     | **Trips** | `POST /api/trips/request` | `{"passengerId": 1, "pickupLat": ..., "dropoffLat": ..., "paymentMethod": "CASH"}` | Created trip record with `REQUESTED` status |
-     | **Trips** | `POST /api/trips/accept` | `{"tripId": 10, "driverId": 2, "vehicleId": 1}` | Pessimistic locking assignment (`200 OK` or `409 Conflict`) |
-     | **Trips** | `POST /api/trips/status` | `{"tripId": 10, "status": "IN_PROGRESS"}` | Advances trip state machine (`EN_ROUTE`, `ARRIVED`, `COMPLETED`) |
-     | **Trips** | `POST /api/trips/cancel` | `{"tripId": 10, "cancelledBy": "PASSENGER", "reason": "..."}` | Cancels trip with grace period fee logic |
-     | **Wallet** | `POST /api/wallet/topup` | `{"passengerId": 1, "amount": 5000.00}` | Updated wallet balance after atomic transaction |
-     | **BI Reports** | `GET /api/reports/revenue` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Daily gross revenue, 20% platform commission, 80% driver payout |
-     | **BI Reports** | `GET /api/reports/drivers` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Trips completed, cancellations, completion rate %, ratings, gross |
-     | **BI Reports** | `GET /api/reports/peak-hours` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Hourly demand histogram (0–23h), completion rate, avg surge |
-     | **BI Reports** | `GET /api/reports/pickup-zones` | `?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=10` | Top high-demand pickup locations ranked by request volume |
-     | **BI Reports** | `GET /api/reports/cancellations` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Breakdown by cancelling party, avg minutes to cancel, lost revenue |
-     | **BI Reports** | `GET /api/reports/loyalty` | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Customer lifetime spend, completed rides, wallet adoption %, tier (Gold/Silver/Bronze) |
+     | Category | Method & Path | Auth | Query / Body Parameters | Response Description |
+     | :--- | :--- | :---: | :--- | :--- |
+     | **System** | `GET /api/health` | Public | None | System status and service health check (`{"status":"UP"}`) |
+     | **Avatar** | `GET /api/avatar` | Public | `?seed=&mood=&size=&shape=&animated=` | Offline native Mimo SVG avatar |
+     | **Auth** | `POST /api/auth/login` | Public | `{"email": "...", "password": "..."}` | Bearer `token`, `userId`, `role`, `status`, `avatarUrl`, `expiresAt` |
+     | **Auth** | `POST /api/auth/logout` | Optional 🔒 | `{}` | Revokes the active session token from `session` table |
+     | **Auth** | `POST /api/auth/register/passenger` | Public | `{"email": "...", "password": "...", "phone": "...", "fullName": "...", "paymentMethod": "WALLET"}` | Registered passenger ID and initial wallet |
+     | **Auth** | `POST /api/auth/register/driver` | Public | `{"email": "...", "password": "...", "phone": "...", "fullName": "...", "licenceNumber": "...", "plateNumber": "...", "make": "...", "model": "...", "seats": 4}` | Registered driver ID with `PENDING` verification status |
+     | **Fare** | `POST /api/fare/estimate` | Public | `{"pickupLat": 4.05, "pickupLng": 9.76, "dropoffLat": 4.07, "dropoffLng": 9.71}` | Distance (km), duration (min), surge multiplier, estimated fare (`totalAmount`) |
+     | **Dispatch** | `GET /api/drivers/available` | Public | `?lat=4.05&lng=9.76&radius=5.0` | List of nearby online drivers with distance, rating, and avatar URL |
+     | **Driver** | `GET/POST /api/drivers/availability` | 🔒 | `?driverId=` or `{"driverId": 2, "status": "ONLINE", "lat": ..., "lng": ...}` | Gets or updates `ONLINE`/`OFFLINE` duty status (and optional GPS coordinates) |
+     | **Driver** | `POST /api/drivers/location` | 🔒 | `{"driverId": 2, "lat": 4.051, "lng": 9.768}` | Updates driver GPS coordinates in `driver_profile` |
+     | **Driver** | `GET /api/drivers/earnings` | 🔒 | `?driverId=2` | Gross revenue, 20% commission, 80% net earnings, completed trips, rating |
+     | **Trips** | `POST /api/trips/request` | 🔒 | `{"passengerId": 4, "pickupLat": ..., "dropoffLat": ..., "paymentMethod": "WALLET"}` | Created trip record with `REQUESTED` status (`402` if insufficient wallet funds) |
+     | **Trips** | `GET /api/trips/pending` | 🔒 | None | Pending `REQUESTED` rides with coordinates, distance, and fare (`totalAmount`) |
+     | **Trips** | `POST /api/trips/accept` | 🔒 | `{"tripId": 10, "driverId": 2}` | Pessimistic locking assignment (`200 OK` or `400` if already taken) |
+     | **Trips** | `GET /api/trips/status` (or `/get`) | 🔒 | `?tripId=` or `?passengerId=` or `?driverId=` | Enriched trip state + fare breakdown + assigned driver & vehicle details |
+     | **Trips** | `POST /api/trips/status` | 🔒 | `{"tripId": 10, "driverId": 2, "action": "EN_ROUTE\|ARRIVED\|START\|COMPLETE", "paymentMethod": "WALLET"}` | Advances trip state machine and settles payment on `COMPLETE` |
+     | **Trips** | `POST /api/trips/cancel` | 🔒 | `{"tripId": 10, "userId": 4, "isPassenger": true}` | Cancels trip with grace period fee logic |
+     | **Wallet** | `GET /api/wallet/balance` | 🔒 | `?passengerId=4` | Current passenger wallet balance |
+     | **Wallet** | `POST /api/wallet/topup` | 🔒 | `{"passengerId": 4, "amount": 5000.00, "provider": "MOBILE_MONEY"}` | Updated wallet balance after atomic transaction |
+     | **Ratings** | `POST /api/ratings` / `GET /api/ratings` | 🔒 (POST) | `{"tripId": 10, "raterId": 4, "rateeId": 2, "score": 5, "comment": "..."}` / `?userId=` | Submits 1–5 star rating (triggers `rating_avg` recalc) or lists user ratings |
+     | **BI Reports** | `GET /api/reports/revenue` | 🔒 Admin | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Daily gross revenue, 20% platform commission, 80% driver payout |
+     | **BI Reports** | `GET /api/reports/drivers` | 🔒 Admin | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Trips completed, cancellations, completion rate %, ratings, gross |
+     | **BI Reports** | `GET /api/reports/peak-hours` | 🔒 Admin | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Hourly demand histogram (0–23h), completion rate, avg surge |
+     | **BI Reports** | `GET /api/reports/pickup-zones` | 🔒 Admin | `?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=10` | Top high-demand pickup locations ranked by request volume |
+     | **BI Reports** | `GET /api/reports/cancellations` | 🔒 Admin | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Breakdown by cancelling party, avg minutes to cancel, lost revenue |
+     | **BI Reports** | `GET /api/reports/loyalty` | 🔒 Admin | `?from=YYYY-MM-DD&to=YYYY-MM-DD` | Customer lifetime spend, completed rides, wallet adoption %, tier (Gold/Silver/Bronze) |
 
 3. **Desktop JavaFX Console (Students 3 & 4):**
    - For **Administrators & Dispatchers** to monitor the fleet in real time, verify driver documents (`AD-2`), update dynamic surge pricing tariffs (`AD-3`), and generate the **5 Business Intelligence Reports** with visual charts (`BarChart`, `PieChart`, `LineChart`).
@@ -440,14 +449,19 @@ flowchart TD
    mysql -u root -p < database/schema.sql
    ```
 
-3. **Build the Application:**
+3. **Build & Test the Application:**
    ```bash
-   mvn clean compile
+   mvn clean test
    ```
 
-4. **Launch the JavaFX Multi-Role Simulation:**
+4. **Launch the REST API Backend (Port 8080, for Mobile/PWA):**
+   ```powershell
+   .\run-api.bat          # or: .\run-api.ps1
+   ```
+
+5. **Launch the JavaFX Multi-Role Simulation:**
    ```bash
-   mvn javafx:run
+   mvn javafx:run         # or on Windows: .\run-desktop.bat
    ```
 
 For complete technical specifications, 10 use case flows, and defense Q&A, refer to **[VIAME_PROJECT_SPECIFICATION.md](VIAME_PROJECT_SPECIFICATION.md)**.

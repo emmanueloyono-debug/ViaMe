@@ -106,16 +106,20 @@ Use standard Retrofit, OkHttp, or `HttpURLConnection` to consume the 17 REST end
 
 To allow the examiners to test concurrent multi-role booking on a single laptop, finish the JavaFX controllers:
 
+> [!NOTE]
+> **Multi-Window Session Isolation (Nov 2026):**  
+> `MainApp` provides `openSimulationWindow(fxmlPath, title, width, height, controllerConfigurer)` and both controllers expose `setPassenger(Passenger)` / `setDriver(Driver)` (`SessionManager` also supports `ThreadLocal` & `createIsolated()`). When opening a concurrent Passenger or Driver window from Admin/Passenger, pass the simulated user via `controller -> controller.setPassenger(...)` / `controller -> controller.setDriver(...)` instead of overwriting the primary stage's Admin session. Keep zero `RestApiServer` fields in controllers (`DesktopIntegrityTest` enforces this).
+
 #### 1. Passenger Console (`PassengerDashboardController.java` & `PassengerDashboard.fxml`):
-- [ ] Connect to `FareCalculationService` to compute real-time fare estimates upon selecting pickup/dropoff points.
+- [ ] Connect to `FareCalculationService.estimate(...)` to compute real-time fare estimates upon selecting pickup/dropoff points.
 - [ ] Call `TripService.requestTrip(...)` to create trips in the database.
-- [ ] Wire simulated status polling or event listener to update the ride progress bar (`ProgressBar` or step badges).
-- [ ] Provide wallet top-up modal calling `PaymentService.topUpWallet(...)`.
-- [ ] Wire post-trip rating submission calling `RatingService.rateDriver(...)`.
+- [ ] Wire simulated status polling (`Timeline` calling `TripService.getActiveTripForPassenger(...)` / `getTripById(...)`) to update the ride progress bar (`ProgressBar` or step badges) and stop polling on window close/logout.
+- [ ] Provide wallet top-up modal calling `PaymentService.topUpWallet(passengerId, amount, provider)`.
+- [ ] Wire post-trip rating submission calling `RatingService.submitRating(tripId, passengerId, driverId, score, comment)`.
 
 #### 2. Driver Console (`DriverDashboardController.java` & `DriverDashboard.fxml`):
 - [ ] Wire the `ONLINE` / `OFFLINE` toggle calling `DriverDAO.updateAvailability(...)`.
-- [ ] Implement incoming ride alert card with 30s countdown timer using JavaFX `Timeline` or `ScheduledExecutorService`.
+- [ ] Implement incoming ride alert card (`TripService.getPendingBroadcastRequests()`) with 30s countdown timer using JavaFX `Timeline` or `ScheduledExecutorService`.
 - [ ] Implement the sequential state transition buttons calling `TripService`:
   - `acceptTrip(...)` $\to$ `driverEnRoute(...)` $\to$ `driverArrived(...)` $\to$ `startTrip(...)` $\to$ `completeTrip(...)`.
 - [ ] Display daily earnings counter updated automatically from `driver.getTotalEarnings()`.
@@ -129,8 +133,8 @@ Before opening your Pull Request for Emmanuel to review, verify:
 - [ ] No direct JDBC or MySQL driver dependencies are added to the Android project (`build.gradle`).
 - [ ] The Android app successfully communicates with `RestApiServer` at `http://10.0.2.2:8080` (or local IP) for login, ride estimation, booking, and wallet top-up.
 - [ ] `mvn clean compile` succeeds on the Java project without breaking any existing classes.
-- [ ] All 43 unit tests in `src/test` continue to pass cleanly.
-- [ ] JavaFX Passenger and Driver dashboard controllers do not contain any hardcoded raw SQL queries (they must delegate strictly to Services).
+- [ ] All unit and integration tests in `src/test/` (including `DesktopIntegrityTest` and `MultiWindowContextTest`) pass cleanly via `mvn test`.
+- [ ] JavaFX Passenger and Driver dashboard controllers do not contain any hardcoded raw SQL queries or `RestApiServer` fields (they must delegate strictly to Services/DAOs).
 
 ---
 

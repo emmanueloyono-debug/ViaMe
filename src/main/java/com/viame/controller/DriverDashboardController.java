@@ -29,13 +29,28 @@ public class DriverDashboardController {
 
     private final AuthenticationService authenticationService = new AuthenticationService();
 
+    protected Driver currentDriver;
+
     @FXML
     public void initialize() {
-        SessionManager.getInstance().getCurrentUser().ifPresent(this::bindDriver);
+        if (currentDriver == null) {
+            SessionManager.getInstance().getCurrentUser().ifPresent(this::bindDriver);
+        }
+    }
+
+    public void setDriver(Driver driver) {
+        this.currentDriver = driver;
+        if (driver != null) {
+            bindDriver(driver);
+        }
     }
 
     protected void bindDriver(User user) {
+        if (user == null) {
+            return;
+        }
         if (user instanceof Driver driver) {
+            this.currentDriver = driver;
             if (driverHeaderLabel != null) {
                 driverHeaderLabel.setText(driver.getFullName() + " • Licence: " + driver.getLicenceNumber());
             }

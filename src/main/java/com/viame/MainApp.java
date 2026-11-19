@@ -11,6 +11,7 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.function.Consumer;
 
 /**
  * Primary JavaFX Application Entry Point & Scene Switcher for ViaMe.
@@ -94,8 +95,26 @@ public class MainApp extends Application {
      * Opens an independent secondary window for multi-role concurrent desktop simulation.
      */
     public static Stage openSimulationWindow(String fxmlPath, String title, int width, int height) {
+        return openSimulationWindow(fxmlPath, title, width, height, null);
+    }
+
+    /**
+     * Opens an independent secondary window for multi-role concurrent desktop simulation
+     * and applies an optional controller configurer (e.g., binding a specific Passenger or Driver).
+     */
+    public static <T> Stage openSimulationWindow(String fxmlPath, String title, int width, int height,
+                                                 Consumer<T> controllerConfigurer) {
         try {
-            Parent root = loadFXML(fxmlPath);
+            URL resource = MainApp.class.getResource(fxmlPath);
+            if (resource == null) {
+                throw new IOException("FXML resource not found on classpath: " + fxmlPath);
+            }
+            FXMLLoader loader = new FXMLLoader(resource);
+            Parent root = loader.load();
+            if (controllerConfigurer != null) {
+                T controller = loader.getController();
+                controllerConfigurer.accept(controller);
+            }
             Scene scene = new Scene(root, width, height);
             attachStylesheet(scene);
             Stage stage = new Stage();

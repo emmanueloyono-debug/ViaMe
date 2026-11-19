@@ -55,21 +55,21 @@ As **Student 4**, you are responsible for:
 
 ### 1. Admin Console & Visual BI Dashboards (`AdminDashboardController.java` & `AdminConsole.fxml`)
 
-The backend reporting engine is already fully implemented by Emmanuel in [`ReportService.java`](src/main/java/com/viame/service/ReportService.java). Your task is to connect the JavaFX UI elements to `ReportService`:
+The backend administration, onboarding, tariff, and reporting engines are already fully implemented by Emmanuel in [`AdminService.java`](../../src/main/java/com/viame/service/AdminService.java) and [`ReportService.java`](../../src/main/java/com/viame/service/ReportService.java). Your task is to connect the JavaFX UI elements directly to `AdminService` and `ReportService`:
 
 - [ ] **Fleet Monitoring Tab:**
-  - `TableView` displaying active rides in Douala (Trip ID, Passenger Name, Driver Name, Pickup, Dropoff, Distance, Current Status).
-  - Live indicator of available online drivers across the city.
+  - `TableView` displaying active rides in Douala via `adminService.getLiveFleetTrips()` (Trip ID, Passenger ID, Driver ID, Pickup, Dropoff, Distance, Current Status).
+  - Live indicator of available online drivers across the city via `adminService.countOnlineDrivers()`.
 - [ ] **Driver Onboarding Verification Table (`AD-2` Workflow):**
-  - Display drivers with `verification_status = PENDING`.
+  - Display drivers with `verification_status = PENDING` via `adminService.getPendingVerificationDrivers()` and load each driver's vehicle via `adminService.getVehicleForDriver(driver.getId())`.
   - Show driver full name, phone number, licence number, vehicle plate, make, model, and seat count.
   - Action buttons:
-    - **Approve Driver:** Updates driver status to `APPROVED` and vehicle to `ACTIVE` (calling `DriverDAO` and `VehicleDAO`).
-    - **Reject Driver:** Updates driver status to `REJECTED` with audit trail logging.
+    - **Approve Driver:** Calls `adminService.approveDriver(adminId, driverId)` (atomically sets driver to `APPROVED`, vehicle to `ACTIVE`, and writes `audit_log`).
+    - **Reject Driver:** Calls `adminService.rejectDriver(adminId, driverId, reason)` (atomically sets driver to `REJECTED`, vehicle to `INACTIVE`, and writes `audit_log`).
 - [ ] **Dynamic Pricing & Surge Tariff Configurator (`AD-3` Workflow):**
-  - Form displaying current active pricing rule parameters: Base Fare, Per-Km Rate, Per-Minute Rate, and Surge Multiplier (1.0x to 3.0x).
+  - Form displaying current active pricing rule parameters via `adminService.getActivePricingRule()`: Tariff Name, Base Fare, Per-Km Rate, Per-Minute Rate, and Surge Multiplier (1.0x to 3.0x).
   - Validation: Ensure all numbers are non-negative and surge is clamped between 1.00 and 3.00.
-  - "Save Tariff" button: Deactivates previous rule, inserts new `pricing_rule` record with `valid_from = NOW()`, and writes audit log entry.
+  - "Save Tariff" button: Calls `adminService.updateTariff(adminId, name, baseFare, perKm, perMin, surge)` (atomically deactivates previous rule, inserts new `pricing_rule` record, and writes `audit_log`).
 - [ ] **5 Business Intelligence (BI) Visual Charts (Spec Section 7):**
   Wire JavaFX charts directly to `ReportService` methods:
   1. *Daily Revenue & Commission Ledger:* `BarChart<String, Number>` plotting Platform Commission (20%) vs Driver Payouts (80%) by date using `reportService.dailyRevenue(from, to)`.
@@ -77,28 +77,26 @@ The backend reporting engine is already fully implemented by Emmanuel in [`Repor
   3. *Peak Demand & Hourly Bookings:* `LineChart<Number, Number>` plotting total ride requests across 0–23h and surge spikes using `reportService.peakHours(from, to)`.
   4. *Trip Cancellation Breakdown:* `PieChart` visualizing cancellation share by cancelling party (Passenger vs Driver vs System) using `reportService.cancellations(from, to)`.
   5. *Customer Loyalty Segmentation:* `BarChart<String, Number>` displaying customer volume per tier (`GOLD`, `SILVER`, `BRONZE`) using `reportService.customerLoyalty(from, to)`.
-  - Provide a **"Export to CSV"** button for each report invoking `ReportService.toCsv(...)` with a JavaFX `FileChooser`.
+  - Provide a **"Export to CSV"** button for each report invoking `ReportService.exportCsv(...)` / `ReportService.toCsv(...)` with a JavaFX `FileChooser`.
+
+> [!NOTE]
+> **Multi-Window Simulation Note:** `MainApp.openSimulationWindow(fxml, title, width, height, controller -> ...)` now supports injecting a dedicated `Passenger` or `Driver` into `PassengerDashboardController.setPassenger(...)` / `DriverDashboardController.setDriver(...)` when launching simulation windows from Admin, and `AdminDashboardController` must never declare `RestApiServer` fields (`DesktopIntegrityTest` enforces decoupling).
 
 ---
 
 ### 2. Quality Assurance, Security & Concurrency Verification
 
 - [ ] **Run the Complete Test Suite:**
-  Verify that all 43 existing unit tests pass:
+  Verify that all **152 unit, integration, REST API, and concurrency tests** (across 39 test classes, including `AdminServiceTest`, `MobileDesktopBackendBridgeTest`, `DesktopIntegrityTest`, and `ConcurrencyRaceConditionTest`) pass via Maven:
   ```powershell
-  # Compile main and test classes
-  $m2 = "$env:USERPROFILE\.m2\repository"
-  $cp = (Get-ChildItem -Path $m2 -Recurse -Filter "*.jar" | ForEach-Object { $_.FullName }) -join ";"
-  $testCp = "$cp;target\classes;target\test-classes"
-  & "$env:USERPROFILE\.jdks\jbr-21.0.11\bin\javac.exe" -cp "$cp" -d target\classes (Get-ChildItem -Path src\main\java -Recurse -Filter "*.java" | ForEach-Object { $_.FullName })
-  & "$env:USERPROFILE\.jdks\jbr-21.0.11\bin\javac.exe" -cp "$testCp" -d target\test-classes (Get-ChildItem -Path src\test\java -Recurse -Filter "*.java" | ForEach-Object { $_.FullName })
+  mvn test
   ```
 - [ ] **Execute Multi-Threaded Concurrency Test (`TC-CONC-01`):**
   - Run [`ConcurrencyRaceConditionTest.java`](src/test/java/com/viame/integration/ConcurrencyRaceConditionTest.java) with a live MySQL instance running (`viame_db`).
   - Demonstrate during oral defense: 5 driver threads simultaneously attempting to accept the same trip, resulting in exactly 1 winner and 4 rejections via MySQL `SELECT ... FOR UPDATE`.
 - [ ] **Security Audit:**
   - Confirm 100% of SQL queries across all 12 DAOs use `PreparedStatement` with zero string concatenation.
-  - Confirm passwords in `user` table use BCrypt work factor 12 with individual salts.
+  - Confirm passwords in `user` table use BCrypt work factor 12 with individual salts, and `RestApiServer` enforces Bearer token auth + RBAC + anti-ID spoofing.
 
 ---
 
@@ -124,12 +122,13 @@ The backend reporting engine is already fully implemented by Emmanuel in [`Repor
 
 Before opening your Pull Request for Emmanuel to review, verify:
 - [ ] `AdminConsole.fxml` loads without errors when clicking "Admin Console" on the login screen.
-- [ ] Driver approval (`AD-2`) changes the driver's status to `APPROVED` and vehicle status to `ACTIVE` in MySQL.
-- [ ] Dynamic tariff changes (`AD-3`) successfully insert a new record in `pricing_rule` and log to `audit_log`.
+- [ ] Driver approval (`AD-2`) via `AdminService.approveDriver(...)` changes the driver's status to `APPROVED` and vehicle status to `ACTIVE` in MySQL.
+- [ ] Dynamic tariff changes (`AD-3`) via `AdminService.updateTariff(...)` successfully insert a new record in `pricing_rule` and log to `audit_log`.
 - [ ] All 5 BI visual charts (`BarChart`, `PieChart`, `LineChart`) render correctly with sample data.
 - [ ] "Export to CSV" generates a valid, well-formatted CSV file.
-- [ ] All 34 existing tests in `src/test/` continue to pass with 0 failures.
+- [ ] All tests in `src/test/` (152+ tests, including `DesktopIntegrityTest` and `ConcurrencyRaceConditionTest`) continue to pass with 0 failures.
 - [ ] The oral defense slide outline is committed in `docs/defense/`.
+- [ ] Portable launcher scripts (`run-desktop.bat` / `run-desktop.ps1` and `run-api.bat` / `run-api.ps1`) launch cleanly on any team machine.
 
 ---
 
